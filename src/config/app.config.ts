@@ -3,28 +3,41 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
-const ROOT = path.resolve(__dirname, '..', '..', '..', '..');
+const ROOT = path.resolve(__dirname, '..', '..', '..');
 
 function resolveRoot(): string {
-  // dist/src/config -> backend dir is three levels up from compiled file; be
-  // robust whether running from dist or ts-node by locating package.json.
+  // dist/src/config -> continental_backend's own root is three levels up
+  // from the compiled file; be robust whether running from dist or ts-node
+  // by locating package.json rather than hardcoding a depth.
   let dir = __dirname;
   for (let i = 0; i < 6; i++) {
-    if (fs.existsSync(path.join(dir, 'package.json'))) return path.resolve(dir, '..');
+    if (fs.existsSync(path.join(dir, 'package.json'))) return dir;
     dir = path.dirname(dir);
   }
   return ROOT;
 }
 
+// Historically continental_backend, continental_client, continental_superadmin
+// and continental_workers lived as sibling folders under one workspace, and
+// the backend served the other three's static files straight off disk — that
+// local layout is still the default. Now that each has its own repo, a
+// standalone deploy (e.g. Render) won't have those siblings on disk, so each
+// path is overridable via env var; the deploy step is responsible for putting
+// something real at whatever path it points to.
+function resolveDir(envVar: string, fallback: string): string {
+  const override = process.env[envVar];
+  return override ? path.resolve(override) : fallback;
+}
+
 @Injectable()
 export class AppConfig {
   readonly root = resolveRoot();
-  readonly backendDir = path.join(this.root, 'continental_backend');
-  readonly dataDir = path.join(this.backendDir, 'data');
+  readonly backendDir = this.root;
+  readonly dataDir = resolveDir('DATA_DIR', path.join(this.backendDir, 'data'));
   readonly uploadsDir = path.join(this.dataDir, 'uploads');
-  readonly clientDir = path.join(this.root, 'continental_client');
-  readonly superadminDir = path.join(this.root, 'continental_superadmin');
-  readonly workersDir = path.join(this.root, 'continental_workers');
+  readonly clientDir = resolveDir('CLIENT_DIR', path.join(this.root, '..', 'continental_client'));
+  readonly superadminDir = resolveDir('SUPERADMIN_DIR', path.join(this.root, '..', 'continental_superadmin'));
+  readonly workersDir = resolveDir('WORKERS_DIR', path.join(this.root, '..', 'continental_workers'));
   // DB_FILE lets the e2e test suite point Prisma at a throwaway database
   // instead of the real one; unset in every normal run (dev/prod).
   readonly dbFile = process.env.DB_FILE || path.join(this.dataDir, 'continental.db');

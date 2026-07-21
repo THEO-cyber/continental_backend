@@ -14,6 +14,13 @@ export class PublicController {
     private readonly settings: SettingsService,
   ) {}
 
+  /** Liveness check for host platforms (e.g. Render) to poll — no auth, no DB access. */
+  @Public()
+  @Get('health')
+  health() {
+    return { status: 'ok' };
+  }
+
   /**
    * Public catalog: published AND approved products only. NEVER exposes price,
    * exact quantity, or branch — customers only ever see "product" and "in stock".

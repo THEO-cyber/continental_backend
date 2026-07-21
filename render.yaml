@@ -1,0 +1,42 @@
+# Render Blueprint — connect this repo on Render and it reads this file
+# automatically ("New +" -> "Blueprint"). See README.md "Deploying to
+# Render" for the one-time manual steps this doesn't cover (custom domain,
+# SITE_URL, changing the default admin password).
+services:
+  - type: web
+    name: continental-backend
+    runtime: node
+    plan: starter # free tier has no persistent disk — the DB and product
+                   # photos would be wiped on every deploy/restart. Starter
+                   # (or above) is required for real data to survive.
+    region: frankfurt # closest Render region to Cameroon
+    buildCommand: >
+      rm -rf vendor && mkdir -p vendor &&
+      git clone --depth 1 https://github.com/THEO-cyber/continental_client.git vendor/continental_client &&
+      git clone --depth 1 https://github.com/THEO-cyber/continental_superadmin.git vendor/continental_superadmin &&
+      git clone --depth 1 https://github.com/THEO-cyber/continental_workers.git vendor/continental_workers &&
+      rm -rf vendor/continental_client/.git vendor/continental_superadmin/.git vendor/continental_workers/.git &&
+      npm install && npx prisma generate && npx nest build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DATABASE_URL
+        value: file:./data/continental.db # only read by `prisma generate` at build time; the app itself always uses DATA_DIR below
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATA_DIR
+        value: /var/data
+      - key: CLIENT_DIR
+        value: vendor/continental_client
+      - key: SUPERADMIN_DIR
+        value: vendor/continental_superadmin
+      - key: WORKERS_DIR
+        value: vendor/continental_workers
+      - key: SITE_URL
+        sync: false # set this once you know your Render URL or custom domain
+    disk:
+      name: continental-data
+      mountPath: /var/data
+      sizeGB: 1
