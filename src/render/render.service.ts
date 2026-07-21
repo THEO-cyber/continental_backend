@@ -230,6 +230,16 @@ export class RenderService {
 
   private contactSection(t: I18n, settings: Settings): string {
     const wa = this.waLink(settings, 'Hello Continental Auto Parts!');
+    const { latitude, longitude } = this.config.business;
+    // "Get Directions" opens Google Maps (what most visitors have installed);
+    // the embedded frame itself uses OpenStreetMap instead — Google's own
+    // keyless embed URL sends X-Frame-Options: SAMEORIGIN and simply refuses
+    // to render in anyone else's iframe, while the official Google embed API
+    // requires a billed API key we don't have. OSM's embed needs neither.
+    const directions = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+    const offset = 0.008;
+    const bbox = [longitude - offset, latitude - offset, longitude + offset, latitude + offset].join(',');
+    const mapEmbed = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${latitude},${longitude}`;
     const rows: Array<[string, string, string | null]> = [
       ['phone', settings.phone, `tel:${String(settings.phone).replace(/\s/g, '')}`],
       ['whatsapp', settings.whatsapp, wa],
@@ -241,11 +251,17 @@ export class RenderService {
     <div class="container">
       <h2>${esc(t.contact.title)}</h2>
       <p class="section-sub">${esc(t.contact.subtitle)}</p>
-      <div class="contact-grid">
-        ${rows.map(([key, value, href]) => `<div class="contact-item">
-          <span class="contact-label">${esc(t.contact[key])}</span>
-          ${href ? `<a href="${attr(href)}" ${href.startsWith('http') ? 'target="_blank" rel="noopener"' : ''}>${esc(value)}</a>` : `<span>${esc(value)}</span>`}
-        </div>`).join('')}
+      <div class="contact-layout">
+        <div class="contact-grid">
+          ${rows.map(([key, value, href]) => `<div class="contact-item">
+            <span class="contact-label">${esc(t.contact[key])}</span>
+            ${href ? `<a href="${attr(href)}" ${href.startsWith('http') ? 'target="_blank" rel="noopener"' : ''}>${esc(value)}</a>` : `<span>${esc(value)}</span>`}
+          </div>`).join('')}
+        </div>
+        <div class="contact-map">
+          <iframe src="${attr(mapEmbed)}" width="100%" height="320" style="border:0" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade" title="${attr(this.config.business.name)} — ${attr(this.config.business.city)} location map"></iframe>
+          <a class="btn btn-map" href="${attr(directions)}" target="_blank" rel="noopener">📍 ${esc(t.contact.directionsCta)}</a>
+        </div>
       </div>
       <a class="btn btn-whatsapp" href="${attr(wa)}" target="_blank" rel="noopener">${esc(t.contact.whatsappCta)}</a>
     </div>

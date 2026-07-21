@@ -14,7 +14,7 @@ export class AuthService {
   async login(username: string, password: string) {
     const user = await this.prisma.user.findUnique({ where: { username: username.trim() } });
     if (!user || !user.active || !verifyPassword(password, user.passwordHash)) {
-      throw new UnauthorizedException('Invalid username or password');
+      throw new UnauthorizedException('Incorrect username or password — please try again.');
     }
     return {
       token: await this.jwt.signAsync({ sub: user.id, role: user.role }),
