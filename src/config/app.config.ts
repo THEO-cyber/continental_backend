@@ -46,8 +46,8 @@ export class AppConfig {
     region: 'South Region',
     country: 'Cameroon',
     countryCode: 'CM',
-    latitude: 2.9373,
-    longitude: 9.9077,
+    latitude: 2.9397889,
+    longitude: 9.9129817,
   };
 
   readonly jwtSecret: string;
