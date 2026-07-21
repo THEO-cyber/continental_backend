@@ -1,0 +1,152 @@
+// Continental Auto Parts — data model.
+// Scaling note: to move to PostgreSQL in production, change provider to
+// "postgresql", set DATABASE_URL to your Postgres connection string, and run
+// `prisma migrate deploy`. No application code changes are required.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  passwordHash String    @map("password_hash")
+  name         String
+  role         String // 'superadmin' | 'worker'
+  active       Int       @default(1)
+  branchId     Int?      @map("branch_id")
+  branch       Branch?   @relation(fields: [branchId], references: [id])
+  createdAt    String    @default("") @map("created_at")
+  sales        Sale[]
+  receipts     Receipt[]
+  productsAdded Product[] @relation("ProductAddedBy")
+
+  @@map("users")
+}
+
+// A physical shop location. Inventory (Product rows) belongs to exactly one
+// branch; the public client site never shows branch info — it only affects
+// superadmin tracking and lets workers search stock at other locations.
+model Branch {
+  id        Int       @id @default(autoincrement())
+  name      String
+  city      String    @default("")
+  active    Int       @default(1)
+  createdAt String    @default("") @map("created_at")
+  products  Product[]
+  workers   User[]
+
+  @@map("branches")
+}
+
+// Product.category stores this row's `key` as a plain string (not a FK) so
+// existing product rows never need migrating when categories change.
+// Superadmin can add new ones from Admin > Categories; the client site shows
+// whichever translated name exists, falling back to the key itself.
+model Category {
+  id        Int    @id @default(autoincrement())
+  key       String @unique
+  nameEn    String @map("name_en")
+  nameFr    String @default("") @map("name_fr")
+  nameZh    String @default("") @map("name_zh")
+  createdAt String @default("") @map("created_at")
+
+  @@map("categories")
+}
+
+model Product {
+  id            Int      @id @default(autoincrement())
+  slug          String   @unique
+  sku           String?
+  nameEn        String   @map("name_en")
+  nameFr        String   @default("") @map("name_fr")
+  nameZh        String   @default("") @map("name_zh")
+  descEn        String   @default("") @map("desc_en")
+  descFr        String   @default("") @map("desc_fr")
+  descZh        String   @default("") @map("desc_zh")
+  category      String   @default("accessories")
+  brand         String   @default("")
+  price         Int      @default(0)
+  quantity      Int      @default(0)
+  image         String   @default("")
+  published     Int      @default(1)
+  // 'approved' (live immediately — superadmin-added) | 'pending' (worker-added,
+  // awaiting superadmin review) — pending items never appear to the client or
+  // in the workers' sell list until approved.
+  status        String   @default("approved")
+  branchId      Int      @map("branch_id")
+  branch        Branch   @relation(fields: [branchId], references: [id])
+  createdById   Int?     @map("created_by_id")
+  createdBy     User?    @relation("ProductAddedBy", fields: [createdById], references: [id])
+  createdAt     String   @default("") @map("created_at")
+  updatedAt     String   @default("") @map("updated_at")
+  sales         Sale[]
+
+  @@map("products")
+}
+
+model Sale {
+  id        Int     @id @default(autoincrement())
+  productId Int     @map("product_id")
+  workerId  Int     @map("worker_id")
+  quantity  Int
+  unitPrice Int     @map("unit_price")
+  total     Int
+  saleDate  String  @map("sale_date")
+  createdAt String  @default("") @map("created_at")
+  product   Product @relation(fields: [productId], references: [id])
+  worker    User    @relation(fields: [workerId], references: [id])
+
+  @@index([saleDate])
+  @@index([productId])
+  @@index([workerId])
+  @@map("sales")
+}
+
+model Setting {
+  key   String @id
+  value String @default("")
+
+  @@map("settings")
+}
+
+// A standalone business document (unlike Sale, which is the per-unit stock
+// ledger): superadmin issues these to companies or walk-in buyers, with
+// price/name snapshotted at issue time so later product edits never change
+// a receipt already handed to a customer.
+model Receipt {
+  id            Int           @id @default(autoincrement())
+  receiptNumber String        @unique @map("receipt_number")
+  buyerType     String        @map("buyer_type") // 'company' | 'individual'
+  buyerName     String        @map("buyer_name")
+  buyerPhone    String        @default("") @map("buyer_phone")
+  buyerAddress  String        @default("") @map("buyer_address")
+  notes         String        @default("")
+  subtotal      Int
+  total         Int
+  issuedById    Int           @map("issued_by_id")
+  issuedBy      User          @relation(fields: [issuedById], references: [id])
+  createdAt     String        @default("") @map("created_at")
+  items         ReceiptItem[]
+
+  @@index([createdAt])
+  @@map("receipts")
+}
+
+model ReceiptItem {
+  id          Int     @id @default(autoincrement())
+  receiptId   Int     @map("receipt_id")
+  receipt     Receipt @relation(fields: [receiptId], references: [id])
+  productId   Int?    @map("product_id")
+  productName String  @map("product_name")
+  sku         String  @default("")
+  quantity    Int
+  unitPrice   Int     @map("unit_price")
+  total       Int
+
+  @@map("receipt_items")
+}
