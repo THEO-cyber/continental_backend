@@ -8,7 +8,7 @@ import { productImageOptions } from '../common/upload';
 @Module({
   imports: [
     MulterModule.registerAsync({
-      useFactory: (config: AppConfig) => productImageOptions(config.uploadsDir, config.maxImageBytes),
+      useFactory: (config: AppConfig) => productImageOptions(config.maxImageBytes),
       inject: [AppConfig],
     }),
   ],

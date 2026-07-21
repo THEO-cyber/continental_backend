@@ -4,7 +4,7 @@ import { createTestApp, closeTestApp, SUPERADMIN } from './utils/test-app';
 
 describe('Sales recording + branch scoping', () => {
   let app: INestApplication;
-  let dbFile: string;
+  let dbName: string;
   let adminToken: string;
   let workerToken: string;
   let branchAId: number;
@@ -13,7 +13,7 @@ describe('Sales recording + branch scoping', () => {
   let productBId: number;
 
   beforeAll(async () => {
-    ({ app, dbFile } = await createTestApp());
+    ({ app, dbName } = await createTestApp());
     const http = app.getHttpServer();
 
     const adminLogin = await request(http).post('/api/auth/login').send(SUPERADMIN);
@@ -35,7 +35,7 @@ describe('Sales recording + branch scoping', () => {
   });
 
   afterAll(async () => {
-    await closeTestApp(app, dbFile);
+    await closeTestApp(app, dbName);
   });
 
   it('records a sale with a worker-entered override price and decrements stock', async () => {

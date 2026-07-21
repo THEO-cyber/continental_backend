@@ -4,12 +4,12 @@ import { createTestApp, closeTestApp, SUPERADMIN } from './utils/test-app';
 
 describe('Receipts (math + PDF) and category bulk-delete safety', () => {
   let app: INestApplication;
-  let dbFile: string;
+  let dbName: string;
   let adminToken: string;
   let auth: { Authorization: string };
 
   beforeAll(async () => {
-    ({ app, dbFile } = await createTestApp());
+    ({ app, dbName } = await createTestApp());
     const login = await request(app.getHttpServer()).post('/api/auth/login').send(SUPERADMIN);
     adminToken = login.body.token;
     auth = { Authorization: `Bearer ${adminToken}` };
@@ -18,7 +18,7 @@ describe('Receipts (math + PDF) and category bulk-delete safety', () => {
   });
 
   afterAll(async () => {
-    await closeTestApp(app, dbFile);
+    await closeTestApp(app, dbName);
   });
 
   it('computes correct item and receipt totals, and generates a real PDF', async () => {

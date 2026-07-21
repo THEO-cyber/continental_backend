@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { BranchesService } from './branches.service';
 import { CreateBranchDto } from './dto/branch.dto';
 import { Roles } from '../common/decorators';
@@ -21,7 +21,7 @@ export class BranchesController {
 
   @Delete(':id')
   @Roles('superadmin')
-  remove(@Param('id', ParseIntPipe) id: number) {
+  remove(@Param('id') id: string) {
     return this.branches.remove(id);
   }
 }

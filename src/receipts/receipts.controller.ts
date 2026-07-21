@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { ReceiptsService } from './receipts.service';
 import { ReceiptPdfService } from './receipt-pdf.service';
@@ -24,13 +24,13 @@ export class ReceiptsController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(@Param('id') id: string) {
     return this.receipts.findOne(id);
   }
 
   @Get(':id/pdf')
   async downloadPdf(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Res() res: Response,
     @Query('download') download?: string,
   ) {

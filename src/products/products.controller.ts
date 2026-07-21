@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put,
+  Body, Controller, Delete, Get, Param, Patch, Post, Put,
   Query, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -24,7 +24,7 @@ export class ProductsController {
     @Query('branchId') branchId?: string,
     @Query('stock') stock?: string,
   ) {
-    return this.products.list(search, category, { branchId: branchId ? Number(branchId) : undefined, stock });
+    return this.products.list(search, category, { branchId: branchId || undefined, stock });
   }
 
   @Get('pending')
@@ -35,13 +35,13 @@ export class ProductsController {
 
   @Post(':id/approve')
   @Roles('superadmin')
-  approve(@Param('id', ParseIntPipe) id: number) {
+  approve(@Param('id') id: string) {
     return this.products.approve(id);
   }
 
   @Post(':id/reject')
   @Roles('superadmin')
-  reject(@Param('id', ParseIntPipe) id: number) {
+  reject(@Param('id') id: string) {
     return this.products.reject(id);
   }
 
@@ -60,7 +60,7 @@ export class ProductsController {
   @Roles('superadmin')
   @UseInterceptors(FileInterceptor('image'))
   update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() dto: UpdateProductDto,
     @UploadedFile() image?: Express.Multer.File,
   ) {
@@ -69,7 +69,7 @@ export class ProductsController {
 
   @Patch(':id/stock')
   @Roles('superadmin')
-  stock(@Param('id', ParseIntPipe) id: number, @Body() dto: StockDto) {
+  stock(@Param('id') id: string, @Body() dto: StockDto) {
     return this.products.adjustStock(id, dto);
   }
 
@@ -84,7 +84,7 @@ export class ProductsController {
 
   @Delete(':id')
   @Roles('superadmin')
-  remove(@Param('id', ParseIntPipe) id: number) {
+  remove(@Param('id') id: string) {
     return this.products.remove(id);
   }
 }

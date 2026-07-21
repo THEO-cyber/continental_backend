@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateWorkerDto, PatchWorkerDto } from './dto/worker.dto';
 import { Roles } from '../common/decorators';
@@ -19,12 +19,12 @@ export class UsersController {
   }
 
   @Patch(':id')
-  patch(@Param('id', ParseIntPipe) id: number, @Body() dto: PatchWorkerDto) {
+  patch(@Param('id') id: string, @Body() dto: PatchWorkerDto) {
     return this.users.patchWorker(id, dto);
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
+  remove(@Param('id') id: string) {
     return this.users.deleteWorker(id);
   }
 }

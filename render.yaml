@@ -6,9 +6,10 @@ services:
   - type: web
     name: continental-backend
     runtime: node
-    plan: starter # free tier has no persistent disk — the DB and product
-                   # photos would be wiped on every deploy/restart. Starter
-                   # (or above) is required for real data to survive.
+    # All real data lives off-box (MongoDB Atlas + Cloudinary), so unlike a
+    # local-disk setup there's nothing here that a redeploy could wipe —
+    # Starter just buys always-on (no cold-start spin-down); Free works too.
+    plan: starter
     region: frankfurt # closest Render region to Cameroon
     buildCommand: >
       rm -rf vendor && mkdir -p vendor &&
@@ -23,11 +24,11 @@ services:
       - key: NODE_VERSION
         value: 20
       - key: DATABASE_URL
-        value: file:./data/continental.db # only read by `prisma generate` at build time; the app itself always uses DATA_DIR below
+        sync: false # your MongoDB Atlas connection string (mongodb+srv://...)
+      - key: CLOUDINARY_URL
+        sync: false # from the Cloudinary dashboard's "API Environment variable" box
       - key: JWT_SECRET
         generateValue: true
-      - key: DATA_DIR
-        value: /var/data
       - key: CLIENT_DIR
         value: vendor/continental_client
       - key: SUPERADMIN_DIR
@@ -36,7 +37,3 @@ services:
         value: vendor/continental_workers
       - key: SITE_URL
         sync: false # set this once you know your Render URL or custom domain
-    disk:
-      name: continental-data
-      mountPath: /var/data
-      sizeGB: 1

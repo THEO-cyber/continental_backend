@@ -38,9 +38,6 @@ export class AppConfig {
   readonly clientDir = resolveDir('CLIENT_DIR', path.join(this.root, '..', 'continental_client'));
   readonly superadminDir = resolveDir('SUPERADMIN_DIR', path.join(this.root, '..', 'continental_superadmin'));
   readonly workersDir = resolveDir('WORKERS_DIR', path.join(this.root, '..', 'continental_workers'));
-  // DB_FILE lets the e2e test suite point Prisma at a throwaway database
-  // instead of the real one; unset in every normal run (dev/prod).
-  readonly dbFile = process.env.DB_FILE || path.join(this.dataDir, 'continental.db');
 
   readonly port = Number(process.env.PORT) || 4000;
   readonly siteUrl = (process.env.SITE_URL || `http://localhost:${Number(process.env.PORT) || 4000}`).replace(/\/+$/, '');

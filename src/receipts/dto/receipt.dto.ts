@@ -1,13 +1,12 @@
 import { Type } from 'class-transformer';
 import {
-  ArrayMinSize, IsArray, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateNested,
+  ArrayMinSize, IsArray, IsIn, IsInt, IsMongoId, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateNested,
 } from 'class-validator';
 
 class ReceiptItemDto {
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  product_id?: number;
+  @IsMongoId()
+  product_id?: string;
 
   @IsOptional()
   @IsString()

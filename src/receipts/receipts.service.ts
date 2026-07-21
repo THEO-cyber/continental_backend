@@ -8,7 +8,7 @@ import { CreateReceiptDto } from './dto/receipt.dto';
 type ReceiptWithRefs = Receipt & { items: ReceiptItem[]; issuedBy: { name: string } };
 
 export interface ApiReceipt {
-  id: number;
+  id: string;
   receipt_number: string;
   buyer_type: string;
   buyer_name: string;
@@ -20,7 +20,7 @@ export interface ApiReceipt {
   issued_by: string;
   created_at: string;
   items: Array<{
-    id: number; product_id: number | null; product_name: string; sku: string;
+    id: string; product_id: string | null; product_name: string; sku: string;
     quantity: number; unit_price: number; total: number;
   }>;
 }
@@ -50,6 +50,8 @@ const RECEIPT_INCLUDE = {
   issuedBy: { select: { name: true } },
 } satisfies Prisma.ReceiptInclude;
 
+type FindAndModifyResult = { value: { value: number } | null };
+
 @Injectable()
 export class ReceiptsService {
   constructor(
@@ -57,8 +59,25 @@ export class ReceiptsService {
     private readonly config: AppConfig,
   ) {}
 
+  /**
+   * MongoDB has no autoincrement, so receipt numbers (which must stay a
+   * clean sequential "CT-2026-000001" a business can print — not an ObjectId)
+   * come from a counters collection, incremented atomically via the MongoDB
+   * findAndModify primitive so two receipts created at once never collide.
+   */
+  private async nextReceiptSeq(year: number): Promise<number> {
+    const result = await this.prisma.$runCommandRaw({
+      findAndModify: 'counters',
+      query: { _id: `receipt_${year}` },
+      update: { $inc: { value: 1 } },
+      new: true,
+      upsert: true,
+    }) as unknown as FindAndModifyResult;
+    return result.value!.value;
+  }
+
   async create(actor: AuthUser, dto: CreateReceiptDto): Promise<{ receipt: ApiReceipt }> {
-    const productIds = dto.items.map((i) => i.product_id).filter((id): id is number => !!id);
+    const productIds = dto.items.map((i) => i.product_id).filter((id): id is string => !!id);
     const products = productIds.length
       ? await this.prisma.product.findMany({ where: { id: { in: productIds } } })
       : [];
@@ -82,25 +101,25 @@ export class ReceiptsService {
     });
     const total = itemsData.reduce((sum, it) => sum + it.total, 0);
 
-    const created = await this.prisma.$transaction(async (tx) => {
-      const row = await tx.receipt.create({
-        data: {
-          receiptNumber: 'PENDING',
-          buyerType: dto.buyer_type,
-          buyerName: dto.buyer_name.trim(),
-          buyerPhone: dto.buyer_phone?.trim() ?? '',
-          buyerAddress: dto.buyer_address?.trim() ?? '',
-          notes: dto.notes?.trim() ?? '',
-          subtotal: total,
-          total,
-          issuedById: actor.id,
-          createdAt: this.config.now(),
-          items: { create: itemsData },
-        },
-        include: RECEIPT_INCLUDE,
-      });
-      const receiptNumber = `CT-${new Date().getFullYear()}-${String(row.id).padStart(6, '0')}`;
-      return tx.receipt.update({ where: { id: row.id }, data: { receiptNumber }, include: RECEIPT_INCLUDE });
+    const year = new Date().getFullYear();
+    const seq = await this.nextReceiptSeq(year);
+    const receiptNumber = `CT-${year}-${String(seq).padStart(6, '0')}`;
+
+    const created = await this.prisma.receipt.create({
+      data: {
+        receiptNumber,
+        buyerType: dto.buyer_type,
+        buyerName: dto.buyer_name.trim(),
+        buyerPhone: dto.buyer_phone?.trim() ?? '',
+        buyerAddress: dto.buyer_address?.trim() ?? '',
+        notes: dto.notes?.trim() ?? '',
+        subtotal: total,
+        total,
+        issuedById: actor.id,
+        createdAt: this.config.now(),
+        items: { create: itemsData },
+      },
+      include: RECEIPT_INCLUDE,
     });
 
     return { receipt: toApi(created) };
@@ -128,7 +147,7 @@ export class ReceiptsService {
     };
   }
 
-  async findOne(id: number): Promise<ApiReceipt> {
+  async findOne(id: string): Promise<ApiReceipt> {
     const receipt = await this.prisma.receipt.findUnique({ where: { id }, include: RECEIPT_INCLUDE });
     if (!receipt) throw new NotFoundException('Receipt not found');
     return toApi(receipt);

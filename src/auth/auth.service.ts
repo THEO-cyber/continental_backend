@@ -12,7 +12,11 @@ export class AuthService {
   ) {}
 
   async login(username: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { username: username.trim() } });
+    // Usernames are stored lowercase (CreateWorkerDto normalizes on the way
+    // in, and the seeded superadmin's is already lowercase) — Postgres has
+    // no case-insensitive collation by default the way SQLite's did, so the
+    // lookup has to normalize the same way to match.
+    const user = await this.prisma.user.findUnique({ where: { username: username.trim().toLowerCase() } });
     if (!user || !user.active || !verifyPassword(password, user.passwordHash)) {
       throw new UnauthorizedException('Incorrect username or password — please try again.');
     }

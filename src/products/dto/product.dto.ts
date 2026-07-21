@@ -1,6 +1,6 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { Transform, Type } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsInt, IsMongoId, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 const toFlag = ({ value }: { value: unknown }) =>
   value === 1 || value === true || value === '1' || value === 'true' ? 1 : 0;
@@ -39,9 +39,8 @@ export class CreateProductDto {
   // first branch when omitted; workers can never choose — it's forced to
   // their own branch regardless of what's sent here.
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  branch_id?: number;
+  @IsMongoId()
+  branch_id?: string;
 }
 
 export class UpdateProductDto extends PartialType(CreateProductDto) {}

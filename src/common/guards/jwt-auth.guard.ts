@@ -24,7 +24,7 @@ export class JwtAuthGuard implements CanActivate {
     const token = header.startsWith('Bearer ') ? header.slice(7) : null;
     if (!token) throw new UnauthorizedException('Authentication required');
 
-    let payload: { sub: number };
+    let payload: { sub: string };
     try {
       payload = await this.jwt.verifyAsync(token);
     } catch {

@@ -4,7 +4,7 @@ import { AppConfig } from '../config/app.config';
 import { RealtimeService } from '../realtime/realtime.service';
 import { CreateCategoryDto } from './dto/category.dto';
 
-function toApi(c: { id: number; key: string; nameEn: string; nameFr: string; nameZh: string }) {
+function toApi(c: { id: string; key: string; nameEn: string; nameFr: string; nameZh: string }) {
   return { id: c.id, key: c.key, name_en: c.nameEn, name_fr: c.nameFr, name_zh: c.nameZh };
 }
 
@@ -47,7 +47,7 @@ export class CategoriesService {
     return { category: toApi(category) };
   }
 
-  async remove(id: number) {
+  async remove(id: string) {
     const category = await this.prisma.category.findUnique({ where: { id } });
     if (!category) throw new NotFoundException('Category not found');
     const inUse = await this.prisma.product.count({ where: { category: category.key } });

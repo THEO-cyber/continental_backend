@@ -72,11 +72,11 @@ export class PublicController {
     @Query('search') search = '',
     @Query('branchId') branchId?: string,
   ) {
-    let scope: number | undefined;
+    let scope: string | undefined;
     if (branchId === 'all') {
       scope = undefined;
     } else if (branchId) {
-      scope = Number(branchId);
+      scope = branchId;
     } else if (user.role === 'worker') {
       const worker = await this.prisma.user.findUnique({ where: { id: user.id } });
       scope = worker?.branchId ?? undefined;

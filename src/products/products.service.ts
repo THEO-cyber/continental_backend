@@ -1,15 +1,14 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Product } from '@prisma/client';
-import * as fs from 'fs';
-import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppConfig } from '../config/app.config';
 import { RealtimeService } from '../realtime/realtime.service';
 import { AuthUser } from '../common/decorators';
+import { deleteProductImage } from '../common/upload';
 import { CreateProductDto, StockDto, UpdateProductDto } from './dto/product.dto';
 
 type ProductWithRefs = Product & {
-  branch?: { id: number; name: string } | null;
+  branch?: { id: string; name: string } | null;
   createdBy?: { name: string } | null;
 };
 
@@ -66,7 +65,7 @@ export class ProductsService {
    * `stock` narrows to 'out' (quantity 0) or 'low' (1..threshold) for the
    * dedicated stock-alert views; `branchId` scopes to one location.
    */
-  async list(search = '', category = '', opts: { branchId?: number; stock?: string } = {}) {
+  async list(search = '', category = '', opts: { branchId?: string; stock?: string } = {}) {
     const where: Prisma.ProductWhereInput = { status: 'approved' };
     if (category) where.category = category;
     if (opts.branchId) where.branchId = opts.branchId;
@@ -86,7 +85,7 @@ export class ProductsService {
     return { products: products.map(toApiProduct) };
   }
 
-  async approve(id: number) {
+  async approve(id: string) {
     const product = await this.findById(id);
     if (product.status !== 'pending') throw new BadRequestException('This product is not awaiting approval');
     const updated = await this.prisma.product.update({
@@ -96,7 +95,7 @@ export class ProductsService {
     return { product: toApiProduct(updated) };
   }
 
-  async reject(id: number) {
+  async reject(id: string) {
     const product = await this.findById(id);
     if (product.status !== 'pending') throw new BadRequestException('This product is not awaiting approval');
     await this.prisma.product.delete({ where: { id } });
@@ -110,12 +109,12 @@ export class ProductsService {
    * "pending" — invisible everywhere until a superadmin approves them.
    */
   async create(dto: CreateProductDto, imageFile: Express.Multer.File | undefined, actor: AuthUser) {
-    let branchId: number;
+    let branchId: string;
     let status: string;
     if (actor.role === 'worker') {
       const worker = await this.prisma.user.findUnique({ where: { id: actor.id } });
       if (!worker?.branchId) {
-        if (imageFile) this.deleteImageFile(`/uploads/${imageFile.filename}`);
+        if (imageFile) this.deleteImageFile(imageFile.path);
         throw new BadRequestException('Your account has no branch assigned — ask the superadmin to set one');
       }
       branchId = worker.branchId;
@@ -139,7 +138,7 @@ export class ProductsService {
         brand: dto.brand ?? '',
         price: dto.price,
         quantity: dto.quantity ?? 0,
-        image: imageFile ? `/uploads/${imageFile.filename}` : '',
+        image: imageFile ? imageFile.path : '',
         published: dto.published ?? 1,
         status,
         branchId,
@@ -153,7 +152,7 @@ export class ProductsService {
     return { product: toApiProduct(product) };
   }
 
-  async update(id: number, dto: UpdateProductDto, imageFile?: Express.Multer.File) {
+  async update(id: string, dto: UpdateProductDto, imageFile?: Express.Multer.File) {
     const product = await this.findById(id, imageFile);
     const data: Record<string, unknown> = {};
     const map: Record<string, keyof UpdateProductDto> = {
@@ -167,7 +166,7 @@ export class ProductsService {
     }
     if (imageFile) {
       this.deleteImageFile(product.image);
-      data.image = `/uploads/${imageFile.filename}`;
+      data.image = imageFile.path;
     }
     if (!Object.keys(data).length) return { product: toApiProduct(product) };
 
@@ -177,7 +176,7 @@ export class ProductsService {
     return { product: toApiProduct(updated) };
   }
 
-  async adjustStock(id: number, dto: StockDto) {
+  async adjustStock(id: string, dto: StockDto) {
     const product = await this.findById(id);
     let quantity: number | undefined;
     if (dto.delta !== undefined) quantity = product.quantity + dto.delta;
@@ -194,7 +193,7 @@ export class ProductsService {
     return { product: toApiProduct(updated) };
   }
 
-  async remove(id: number) {
+  async remove(id: string) {
     const product = await this.findById(id);
     const hasSales = await this.prisma.sale.findFirst({ where: { productId: product.id } });
     if (hasSales) {
@@ -248,25 +247,24 @@ export class ProductsService {
     return { deleted: toDelete.length, archived: toArchive.length, total: matching.length };
   }
 
-  private async findById(id: number, uploadedFile?: Express.Multer.File): Promise<ProductWithRefs> {
+  private async findById(id: string, uploadedFile?: Express.Multer.File): Promise<ProductWithRefs> {
     const product = await this.prisma.product.findUnique({ where: { id }, include: PRODUCT_INCLUDE });
     if (!product) {
       // Don't leave orphaned uploads behind when the target row is missing.
-      if (uploadedFile) this.deleteImageFile(`/uploads/${uploadedFile.filename}`);
+      if (uploadedFile) this.deleteImageFile(uploadedFile.path);
       throw new NotFoundException('Product not found');
     }
     return product;
   }
 
-  private async defaultBranchId(): Promise<number> {
+  private async defaultBranchId(): Promise<string> {
     const first = await this.prisma.branch.findFirst({ orderBy: { id: 'asc' } });
     if (!first) throw new BadRequestException('Create a branch first (Admin > Branches)');
     return first.id;
   }
 
   private deleteImageFile(image: string): void {
-    if (!image) return;
-    fs.unlink(path.join(this.config.uploadsDir, path.basename(image)), () => undefined);
+    deleteProductImage(image);
   }
 
   private async uniqueSlug(name: string): Promise<string> {

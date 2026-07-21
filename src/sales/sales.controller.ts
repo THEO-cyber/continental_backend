@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param, ParseIntPipe, Post, Query, Res, Body } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Post, Query, Res, Body } from '@nestjs/common';
 import { Response } from 'express';
 import { SalesService } from './sales.service';
 import { RecordSaleDto } from './dto/sale.dto';
@@ -54,7 +54,7 @@ export class SalesController {
   @Get('worker/:workerId')
   @Roles('superadmin')
   workerReport(
-    @Param('workerId', ParseIntPipe) workerId: number,
+    @Param('workerId') workerId: string,
     @Query('period') period?: string,
     @Query('date') date?: string,
   ) {
@@ -65,7 +65,7 @@ export class SalesController {
   @Roles('superadmin')
   async workerExport(
     @Res() res: Response,
-    @Param('workerId', ParseIntPipe) workerId: number,
+    @Param('workerId') workerId: string,
     @Query('period') period?: string,
     @Query('date') date?: string,
   ) {
@@ -75,7 +75,7 @@ export class SalesController {
 
   @Delete(':id')
   @Roles('superadmin')
-  remove(@Param('id', ParseIntPipe) id: number) {
+  remove(@Param('id') id: string) {
     return this.sales.remove(id);
   }
 }

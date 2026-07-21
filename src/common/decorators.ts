@@ -9,7 +9,7 @@ export const ROLES_KEY = 'roles';
 export const Roles = (...roles: string[]) => SetMetadata(ROLES_KEY, roles);
 
 export interface AuthUser {
-  id: number;
+  id: string;
   username: string;
   name: string;
   role: string;

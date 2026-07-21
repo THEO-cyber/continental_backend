@@ -20,4 +20,6 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - run: npx nest build
+      # Spins up its own in-memory MongoDB replica set (mongodb-memory-server)
+      # — no external database service needed for tests.
       - run: npm test

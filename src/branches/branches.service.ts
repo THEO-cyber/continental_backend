@@ -54,7 +54,7 @@ export class BranchesService {
     return { branch: { id: branch.id, name: branch.name, city: branch.city, active: branch.active } };
   }
 
-  async remove(id: number) {
+  async remove(id: string) {
     const branch = await this.prisma.branch.findUnique({ where: { id } });
     if (!branch) throw new NotFoundException('Branch not found');
     const [productCount, workerCount] = await Promise.all([

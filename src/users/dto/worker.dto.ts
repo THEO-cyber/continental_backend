@@ -1,5 +1,5 @@
-import { Transform, Type } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsMongoId, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class CreateWorkerDto {
   @IsString()
@@ -18,9 +18,8 @@ export class CreateWorkerDto {
   // Which branch this worker sells from. Optional: defaults to the shop's
   // first branch when there's only one location.
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  branch_id?: number;
+  @IsMongoId()
+  branch_id?: string;
 }
 
 export class PatchWorkerDto {
@@ -34,7 +33,6 @@ export class PatchWorkerDto {
   password?: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  branch_id?: number;
+  @IsMongoId()
+  branch_id?: string;
 }

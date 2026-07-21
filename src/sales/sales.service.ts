@@ -48,7 +48,7 @@ export class SalesService {
    * the price actually sold at (parts prices are negotiated/vary); omitting it
    * falls back to the product's current reference price.
    */
-  async record(actor: AuthUser, productId: number, quantity: number, unitPriceOverride?: number) {
+  async record(actor: AuthUser, productId: string, quantity: number, unitPriceOverride?: number) {
     const saleId = await this.prisma.$transaction(async (tx) => {
       const product = await tx.product.findUnique({ where: { id: productId } });
       if (!product) throw new NotFoundException('Product not found');
@@ -178,7 +178,7 @@ export class SalesService {
    * a year) so the superadmin can find any worker's activity without digging
    * through a mixed, all-worker report.
    */
-  async workerReport(workerId: number, periodParam?: string, dateParam?: string) {
+  async workerReport(workerId: string, periodParam?: string, dateParam?: string) {
     const period = ['day', 'month', 'year'].includes(periodParam || '') ? periodParam! : 'day';
     const worker = await this.prisma.user.findFirst({ where: { id: workerId, role: 'worker' } });
     if (!worker) throw new NotFoundException('Worker not found');
@@ -255,7 +255,7 @@ export class SalesService {
   }
 
   /** CSV export of one worker's transactions for a period — for offline/company records. */
-  async workerExportCsv(workerId: number, period?: string, date?: string): Promise<{ filename: string; csv: string }> {
+  async workerExportCsv(workerId: string, period?: string, date?: string): Promise<{ filename: string; csv: string }> {
     const report = await this.workerReport(workerId, period, date);
     const header = ['Sale ID', 'Date', 'Time', 'Product', 'SKU', 'Quantity', 'Unit Price (FCFA)', 'Total (FCFA)'];
     const rows = report.detail.map((s) => [
@@ -280,7 +280,7 @@ export class SalesService {
         (where.saleDate as Prisma.StringFilter).lte = params.to;
       }
     }
-    if (params.workerId) where.workerId = Number(params.workerId);
+    if (params.workerId) where.workerId = params.workerId;
 
     const sales = await this.prisma.sale.findMany({ where, include: SALE_INCLUDE, orderBy: { id: 'asc' } });
     const header = ['Sale ID', 'Date', 'Time', 'Worker', 'Product', 'SKU', 'Quantity', 'Unit Price (FCFA)', 'Total (FCFA)'];
@@ -294,7 +294,7 @@ export class SalesService {
   }
 
   /** Corrects a mistaken sale: removes it and restores the stock. */
-  async remove(id: number) {
+  async remove(id: string) {
     const sale = await this.prisma.sale.findUnique({ where: { id } });
     if (!sale) throw new NotFoundException('Sale not found');
     await this.prisma.$transaction([

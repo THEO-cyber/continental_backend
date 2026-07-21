@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/category.dto';
 import { Roles } from '../common/decorators';
@@ -21,7 +21,7 @@ export class CategoriesController {
 
   @Delete(':id')
   @Roles('superadmin')
-  remove(@Param('id', ParseIntPipe) id: number) {
+  remove(@Param('id') id: string) {
     return this.categories.remove(id);
   }
 }

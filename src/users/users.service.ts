@@ -6,7 +6,7 @@ import { RealtimeService } from '../realtime/realtime.service';
 import { hashPassword } from '../common/crypto.util';
 import { CreateWorkerDto, PatchWorkerDto } from './dto/worker.dto';
 
-type WorkerWithBranch = User & { branch: { id: number; name: string } | null };
+type WorkerWithBranch = User & { branch: { id: string; name: string } | null };
 
 @Injectable()
 export class UsersService {
@@ -68,9 +68,9 @@ export class UsersService {
     return { worker: this.publicShape(worker) };
   }
 
-  async patchWorker(id: number, dto: PatchWorkerDto) {
+  async patchWorker(id: string, dto: PatchWorkerDto) {
     const worker = await this.findWorker(id);
-    const data: { active?: number; passwordHash?: string; branchId?: number } = {};
+    const data: { active?: number; passwordHash?: string; branchId?: string } = {};
     if (dto.active !== undefined) data.active = dto.active;
     if (dto.password !== undefined) data.passwordHash = hashPassword(dto.password);
     if (dto.branch_id !== undefined) data.branchId = await this.resolveBranchId(dto.branch_id);
@@ -85,7 +85,7 @@ export class UsersService {
     return { worker: this.publicShape(updated) };
   }
 
-  async deleteWorker(id: number) {
+  async deleteWorker(id: string) {
     const worker = await this.findWorker(id);
     const hasSales = await this.prisma.sale.findFirst({ where: { workerId: worker.id } });
     if (hasSales) {
@@ -99,7 +99,7 @@ export class UsersService {
     return { ok: true, archived: false };
   }
 
-  private async resolveBranchId(requested?: number): Promise<number> {
+  private async resolveBranchId(requested?: string): Promise<string> {
     if (requested) {
       const branch = await this.prisma.branch.findUnique({ where: { id: requested } });
       if (!branch) throw new BadRequestException('Branch not found');
@@ -110,7 +110,7 @@ export class UsersService {
     return first.id;
   }
 
-  private async findWorker(id: number) {
+  private async findWorker(id: string) {
     const worker = await this.prisma.user.findFirst({ where: { id, role: 'worker' } });
     if (!worker) throw new NotFoundException('Worker not found');
     return worker;

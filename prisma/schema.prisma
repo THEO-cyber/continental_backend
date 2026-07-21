@@ -1,24 +1,24 @@
-// Continental Auto Parts — data model.
-// Scaling note: to move to PostgreSQL in production, change provider to
-// "postgresql", set DATABASE_URL to your Postgres connection string, and run
-// `prisma migrate deploy`. No application code changes are required.
+// Continental Auto Parts — data model. Runs on MongoDB: DATABASE_URL must be
+// a mongodb+srv:// (Atlas) or mongodb:// connection string. MongoDB is
+// schemaless at the storage layer, so there's no migration history here —
+// `prisma db push` syncs this schema (indexes, etc.) to the cluster directly.
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id           Int       @id @default(autoincrement())
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
   username     String    @unique
   passwordHash String    @map("password_hash")
   name         String
   role         String // 'superadmin' | 'worker'
   active       Int       @default(1)
-  branchId     Int?      @map("branch_id")
+  branchId     String?   @map("branch_id") @db.ObjectId
   branch       Branch?   @relation(fields: [branchId], references: [id])
   createdAt    String    @default("") @map("created_at")
   sales        Sale[]
@@ -32,7 +32,7 @@ model User {
 // branch; the public client site never shows branch info — it only affects
 // superadmin tracking and lets workers search stock at other locations.
 model Branch {
-  id        Int       @id @default(autoincrement())
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
   name      String
   city      String    @default("")
   active    Int       @default(1)
@@ -48,7 +48,7 @@ model Branch {
 // Superadmin can add new ones from Admin > Categories; the client site shows
 // whichever translated name exists, falling back to the key itself.
 model Category {
-  id        Int    @id @default(autoincrement())
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
   key       String @unique
   nameEn    String @map("name_en")
   nameFr    String @default("") @map("name_fr")
@@ -59,7 +59,7 @@ model Category {
 }
 
 model Product {
-  id            Int      @id @default(autoincrement())
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
   slug          String   @unique
   sku           String?
   nameEn        String   @map("name_en")
@@ -78,21 +78,24 @@ model Product {
   // awaiting superadmin review) — pending items never appear to the client or
   // in the workers' sell list until approved.
   status        String   @default("approved")
-  branchId      Int      @map("branch_id")
+  branchId      String   @map("branch_id") @db.ObjectId
   branch        Branch   @relation(fields: [branchId], references: [id])
-  createdById   Int?     @map("created_by_id")
+  createdById   String?  @map("created_by_id") @db.ObjectId
   createdBy     User?    @relation("ProductAddedBy", fields: [createdById], references: [id])
   createdAt     String   @default("") @map("created_at")
   updatedAt     String   @default("") @map("updated_at")
   sales         Sale[]
 
+  @@index([published])
+  @@index([status])
+  @@index([branchId])
   @@map("products")
 }
 
 model Sale {
-  id        Int     @id @default(autoincrement())
-  productId Int     @map("product_id")
-  workerId  Int     @map("worker_id")
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  productId String  @map("product_id") @db.ObjectId
+  workerId  String  @map("worker_id") @db.ObjectId
   quantity  Int
   unitPrice Int     @map("unit_price")
   total     Int
@@ -108,7 +111,7 @@ model Sale {
 }
 
 model Setting {
-  key   String @id
+  key   String @id @map("_id")
   value String @default("")
 
   @@map("settings")
@@ -119,7 +122,7 @@ model Setting {
 // price/name snapshotted at issue time so later product edits never change
 // a receipt already handed to a customer.
 model Receipt {
-  id            Int           @id @default(autoincrement())
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
   receiptNumber String        @unique @map("receipt_number")
   buyerType     String        @map("buyer_type") // 'company' | 'individual'
   buyerName     String        @map("buyer_name")
@@ -128,7 +131,7 @@ model Receipt {
   notes         String        @default("")
   subtotal      Int
   total         Int
-  issuedById    Int           @map("issued_by_id")
+  issuedById    String        @map("issued_by_id") @db.ObjectId
   issuedBy      User          @relation(fields: [issuedById], references: [id])
   createdAt     String        @default("") @map("created_at")
   items         ReceiptItem[]
@@ -138,15 +141,17 @@ model Receipt {
 }
 
 model ReceiptItem {
-  id          Int     @id @default(autoincrement())
-  receiptId   Int     @map("receipt_id")
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  receiptId   String  @map("receipt_id") @db.ObjectId
   receipt     Receipt @relation(fields: [receiptId], references: [id])
-  productId   Int?    @map("product_id")
+  productId   String? @map("product_id") @db.ObjectId
   productName String  @map("product_name")
   sku         String  @default("")
   quantity    Int
   unitPrice   Int     @map("unit_price")
   total       Int
+
+  @@index([receiptId])
 
   @@map("receipt_items")
 }

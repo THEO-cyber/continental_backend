@@ -1,10 +1,9 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Min } from 'class-validator';
+import { IsInt, IsMongoId, IsOptional, Min } from 'class-validator';
 
 export class RecordSaleDto {
-  @Type(() => Number)
-  @IsInt({ message: 'A product and a quantity of at least 1 are required' })
-  product_id: number;
+  @IsMongoId({ message: 'A product and a quantity of at least 1 are required' })
+  product_id: string;
 
   @Type(() => Number)
   @IsInt({ message: 'A product and a quantity of at least 1 are required' })

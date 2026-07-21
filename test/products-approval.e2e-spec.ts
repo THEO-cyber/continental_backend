@@ -10,14 +10,14 @@ import { createTestApp, closeTestApp, SUPERADMIN } from './utils/test-app';
  */
 describe('Worker product submission -> approval workflow', () => {
   let app: INestApplication;
-  let dbFile: string;
+  let dbName: string;
   let adminToken: string;
   let workerToken: string;
   let branchAId: number;
   let branchBId: number;
 
   beforeAll(async () => {
-    ({ app, dbFile } = await createTestApp());
+    ({ app, dbName } = await createTestApp());
     const http = app.getHttpServer();
 
     const adminLogin = await request(http).post('/api/auth/login').send(SUPERADMIN);
@@ -47,7 +47,7 @@ describe('Worker product submission -> approval workflow', () => {
   });
 
   afterAll(async () => {
-    await closeTestApp(app, dbFile);
+    await closeTestApp(app, dbName);
   });
 
   const PRODUCT_NAME = 'Regression Test Turbocharger XYZ';

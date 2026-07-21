@@ -4,14 +4,14 @@ import { createTestApp, closeTestApp, SUPERADMIN } from './utils/test-app';
 
 describe('Auth + RBAC', () => {
   let app: INestApplication;
-  let dbFile: string;
+  let dbName: string;
 
   beforeAll(async () => {
-    ({ app, dbFile } = await createTestApp());
+    ({ app, dbName } = await createTestApp());
   });
 
   afterAll(async () => {
-    await closeTestApp(app, dbFile);
+    await closeTestApp(app, dbName);
   });
 
   it('logs in the seeded superadmin with correct credentials', async () => {
