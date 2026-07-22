@@ -1,0 +1,19 @@
+name: Keep Render Awake
+
+# Render's free tier spins a web service down after 15 minutes with no
+# traffic (cold start on the next request takes ~1 minute). Pinging the
+# health endpoint every 10 minutes keeps it warm. Note: this alone uses
+# close to Render's full 750 free instance-hours/month for this one
+# service — fine if it's the only free service in the workspace, but leaves
+# little headroom for anything else on the same account.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: curl -sf --max-time 20 https://continental-backend-yieu.onrender.com/api/health
