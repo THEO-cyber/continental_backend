@@ -2,6 +2,10 @@
 # automatically ("New +" -> "Blueprint"). See README.md "Deploying to
 # Render" for the one-time manual steps this doesn't cover (custom domain,
 # SITE_URL, changing the default admin password).
+#
+# Superadmin and Workers are hosted separately (static sites, e.g. Cloudflare
+# Pages) and call this API cross-origin -- CORS_ORIGINS must list their real
+# URLs once deployed.
 services:
   - type: web
     name: continental-backend
@@ -14,9 +18,7 @@ services:
     buildCommand: >
       rm -rf vendor && mkdir -p vendor &&
       git clone --depth 1 https://github.com/THEO-cyber/continental_client.git vendor/continental_client &&
-      git clone --depth 1 https://github.com/THEO-cyber/continental_superadmin.git vendor/continental_superadmin &&
-      git clone --depth 1 https://github.com/THEO-cyber/continental_workers.git vendor/continental_workers &&
-      rm -rf vendor/continental_client/.git vendor/continental_superadmin/.git vendor/continental_workers/.git &&
+      rm -rf vendor/continental_client/.git &&
       npm install && npx prisma generate && npx nest build
     startCommand: npm start
     healthCheckPath: /api/health
@@ -31,9 +33,7 @@ services:
         generateValue: true
       - key: CLIENT_DIR
         value: vendor/continental_client
-      - key: SUPERADMIN_DIR
-        value: vendor/continental_superadmin
-      - key: WORKERS_DIR
-        value: vendor/continental_workers
       - key: SITE_URL
         sync: false # set this once you know your Render URL or custom domain
+      - key: CORS_ORIGINS
+        sync: false # comma-separated: the Superadmin and Workers static-site URLs

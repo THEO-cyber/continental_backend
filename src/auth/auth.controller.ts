@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { ChangePasswordDto, LoginDto } from './dto/auth.dto';
+import { ChangePasswordDto, ChangeUsernameDto, LoginDto } from './dto/auth.dto';
 import { AuthUser, CurrentUser, Public } from '../common/decorators';
 
 @Controller('api/auth')
@@ -27,5 +27,11 @@ export class AuthController {
   async changePassword(@CurrentUser() user: AuthUser, @Body() dto: ChangePasswordDto) {
     await this.auth.changePassword(user, dto.current, dto.next);
     return { ok: true };
+  }
+
+  @HttpCode(200)
+  @Post('change-username')
+  changeUsername(@CurrentUser() user: AuthUser, @Body() dto: ChangeUsernameDto) {
+    return this.auth.changeUsername(user, dto.password, dto.username);
   }
 }

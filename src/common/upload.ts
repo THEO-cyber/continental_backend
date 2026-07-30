@@ -42,5 +42,8 @@ export function deleteProductImage(image: string): void {
   const publicId = cloudinaryPublicId(image);
   if (!publicId) return;
   cloudinary.config();
-  cloudinary.uploader.destroy(publicId).catch(() => undefined);
+  // invalidate: true also purges the old URL from Cloudinary's CDN edge
+  // cache, not just the origin asset — otherwise a stale copy can keep
+  // resolving at that exact URL for a while after deletion.
+  cloudinary.uploader.destroy(publicId, { invalidate: true }).catch(() => undefined);
 }

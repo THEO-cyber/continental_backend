@@ -3,7 +3,11 @@ import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 import { RealtimeService } from './realtime.service';
 
-@WebSocketGateway({ cors: { origin: true } })
+// Mirrors AppConfig.corsOrigins, read directly from the env since gateway
+// decorator options are evaluated before Nest's DI container exists.
+const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean);
+
+@WebSocketGateway({ cors: { origin: allowedOrigins.length ? allowedOrigins : false, credentials: true } })
 export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
   constructor(
     private readonly jwt: JwtService,

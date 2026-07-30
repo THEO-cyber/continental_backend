@@ -17,13 +17,12 @@ function resolveRoot(): string {
   return ROOT;
 }
 
-// Historically continental_backend, continental_client, continental_superadmin
-// and continental_workers lived as sibling folders under one workspace, and
-// the backend served the other three's static files straight off disk — that
-// local layout is still the default. Now that each has its own repo, a
-// standalone deploy (e.g. Render) won't have those siblings on disk, so each
-// path is overridable via env var; the deploy step is responsible for putting
-// something real at whatever path it points to.
+// Historically continental_backend and continental_client lived as sibling
+// folders under one workspace, and the backend served the client's static
+// files straight off disk — that local layout is still the default. Now that
+// each has its own repo, a standalone deploy (e.g. Render) won't have that
+// sibling on disk, so the path is overridable via env var; the deploy step is
+// responsible for putting something real at whatever path it points to.
 function resolveDir(envVar: string, fallback: string): string {
   const override = process.env[envVar];
   return override ? path.resolve(override) : fallback;
@@ -36,8 +35,6 @@ export class AppConfig {
   readonly dataDir = resolveDir('DATA_DIR', path.join(this.backendDir, 'data'));
   readonly uploadsDir = path.join(this.dataDir, 'uploads');
   readonly clientDir = resolveDir('CLIENT_DIR', path.join(this.root, '..', 'continental_client'));
-  readonly superadminDir = resolveDir('SUPERADMIN_DIR', path.join(this.root, '..', 'continental_superadmin'));
-  readonly workersDir = resolveDir('WORKERS_DIR', path.join(this.root, '..', 'continental_workers'));
 
   readonly port = Number(process.env.PORT) || 4000;
   readonly siteUrl = (process.env.SITE_URL || `http://localhost:${Number(process.env.PORT) || 4000}`).replace(/\/+$/, '');
@@ -48,6 +45,13 @@ export class AppConfig {
   readonly lowStockThreshold = 5;
   readonly maxImageBytes = 5 * 1024 * 1024;
   readonly redisUrl = process.env.REDIS_URL || '';
+  // Superadmin and Workers are hosted as separate static sites and call this
+  // API cross-origin, so they must be explicitly allow-listed. Comma-separated;
+  // e.g. "https://admin.example.com,https://workers.example.com".
+  readonly corsOrigins = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
 
   readonly business = {
     name: 'Continental Auto Parts',

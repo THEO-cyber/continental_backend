@@ -193,58 +193,31 @@ export class ProductsService {
     return { product: toApiProduct(updated) };
   }
 
+  /**
+   * Always a real delete: removes the row and purges its Cloudinary image,
+   * even if it has sales history. Old sales/receipts referencing this id
+   * still display fine afterward — they snapshot what they need at the time
+   * (a receipt line never re-reads the live product; a sale row falls back
+   * to "(deleted product)" — see toApiSale in sales.service.ts).
+   */
   async remove(id: string) {
     const product = await this.findById(id);
-    const hasSales = await this.prisma.sale.findFirst({ where: { productId: product.id } });
-    if (hasSales) {
-      // Sales history references this product: hide it everywhere instead of hard-deleting.
-      await this.prisma.product.update({
-        where: { id: product.id },
-        data: { published: 0, quantity: 0, updatedAt: this.config.now() },
-      });
-      this.realtime.catalogChanged();
-      return { ok: true, archived: true, message: 'Product has sales history; it was unpublished and zeroed instead of deleted.' };
-    }
     await this.prisma.product.delete({ where: { id: product.id } });
     this.deleteImageFile(product.image);
     this.realtime.catalogChanged();
-    return { ok: true, archived: false };
+    return { ok: true };
   }
 
-  /**
-   * Bulk delete — all products, or every product in one category. Same
-   * safety rule as single delete: anything with sales history is archived
-   * (unpublished + zeroed) instead of hard-deleted, so reports never break.
-   */
+  /** Bulk delete — all products, or every product in one category. Always a real delete (see remove() above). */
   async removeAll(category?: string) {
     const where = category ? { category } : {};
     const matching = await this.prisma.product.findMany({ where, select: { id: true, image: true } });
-    if (!matching.length) return { deleted: 0, archived: 0, total: 0 };
+    if (!matching.length) return { deleted: 0, total: 0 };
 
-    const ids = matching.map((p) => p.id);
-    const soldIds = new Set(
-      (await this.prisma.sale.findMany({
-        where: { productId: { in: ids } },
-        select: { productId: true },
-        distinct: ['productId'],
-      })).map((s) => s.productId),
-    );
-
-    const toArchive = ids.filter((id) => soldIds.has(id));
-    const toDelete = matching.filter((p) => !soldIds.has(p.id));
-
-    if (toArchive.length) {
-      await this.prisma.product.updateMany({
-        where: { id: { in: toArchive } },
-        data: { published: 0, quantity: 0, updatedAt: this.config.now() },
-      });
-    }
-    if (toDelete.length) {
-      await this.prisma.product.deleteMany({ where: { id: { in: toDelete.map((p) => p.id) } } });
-      for (const p of toDelete) this.deleteImageFile(p.image);
-    }
+    await this.prisma.product.deleteMany({ where: { id: { in: matching.map((p) => p.id) } } });
+    for (const p of matching) this.deleteImageFile(p.image);
     this.realtime.catalogChanged();
-    return { deleted: toDelete.length, archived: toArchive.length, total: matching.length };
+    return { deleted: matching.length, total: matching.length };
   }
 
   private async findById(id: string, uploadedFile?: Express.Multer.File): Promise<ProductWithRefs> {

@@ -93,16 +93,22 @@ model Product {
 }
 
 model Sale {
-  id        String  @id @default(auto()) @map("_id") @db.ObjectId
-  productId String  @map("product_id") @db.ObjectId
-  workerId  String  @map("worker_id") @db.ObjectId
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  // Optional + SetNull: superadmin can hard-delete a product (Cloudinary +
+  // DB) even with sales history attached (that's the point of the delete —
+  // see products.service.ts). Without SetNull, Prisma's MongoDB referential
+  // integrity emulation blocks the delete outright while any Sale still
+  // points at it. toApiSale() in sales.service.ts renders a null product as
+  // "(deleted product)" instead of crashing.
+  productId String?  @map("product_id") @db.ObjectId
+  workerId  String   @map("worker_id") @db.ObjectId
   quantity  Int
-  unitPrice Int     @map("unit_price")
+  unitPrice Int      @map("unit_price")
   total     Int
-  saleDate  String  @map("sale_date")
-  createdAt String  @default("") @map("created_at")
-  product   Product @relation(fields: [productId], references: [id])
-  worker    User    @relation(fields: [workerId], references: [id])
+  saleDate  String   @map("sale_date")
+  createdAt String   @default("") @map("created_at")
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  worker    User     @relation(fields: [workerId], references: [id])
 
   @@index([saleDate])
   @@index([productId])

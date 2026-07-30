@@ -7,8 +7,11 @@ import { AuthUser } from '../common/decorators';
 import { toCsv } from '../common/csv.util';
 
 type SaleWithRefs = Sale & {
-  product: { nameEn: string; sku: string | null; image: string };
-  worker: { name: string };
+  // Nullable despite Prisma's generated type: Mongo doesn't enforce the
+  // relation, and superadmin can delete a product that still has sales
+  // history (Cloudinary + DB cleanup is the point — see products.service.ts).
+  product: { nameEn: string; sku: string | null; image: string } | null;
+  worker: { name: string } | null;
 };
 
 /** v1 sale-detail shape (snake_case) used by the admin and workers frontends. */
@@ -21,10 +24,10 @@ function toApiSale(s: SaleWithRefs) {
     total: s.total,
     sale_date: s.saleDate,
     created_at: s.createdAt,
-    product_name: s.product.nameEn,
-    sku: s.product.sku ?? '',
-    image: s.product.image,
-    worker_name: s.worker.name,
+    product_name: s.product?.nameEn ?? '(deleted product)',
+    sku: s.product?.sku ?? '',
+    image: s.product?.image ?? '',
+    worker_name: s.worker?.name ?? '(deleted worker)',
   };
 }
 
@@ -111,17 +114,18 @@ export class SalesService {
         orderBy: { id: 'desc' },
       }),
     ]);
+    const productIds = grouped.map((g) => g.productId).filter((pid): pid is string => pid !== null);
     const products = await this.prisma.product.findMany({
-      where: { id: { in: grouped.map((g) => g.productId) } },
+      where: { id: { in: productIds } },
       select: { id: true, nameEn: true, sku: true, image: true },
     });
     const byId = new Map(products.map((p) => [p.id, p]));
     const rows = grouped
       .map((g) => ({
         product_id: g.productId,
-        product_name: byId.get(g.productId)?.nameEn ?? '',
-        sku: byId.get(g.productId)?.sku ?? '',
-        image: byId.get(g.productId)?.image ?? '',
+        product_name: (g.productId && byId.get(g.productId)?.nameEn) ?? '(deleted product)',
+        sku: (g.productId && byId.get(g.productId)?.sku) ?? '',
+        image: (g.productId && byId.get(g.productId)?.image) ?? '',
         quantity: g._sum.quantity ?? 0,
         amount: g._sum.total ?? 0,
       }))
@@ -204,17 +208,18 @@ export class SalesService {
       }),
     ]);
 
+    const productIds = grouped.map((g) => g.productId).filter((pid): pid is string => pid !== null);
     const products = await this.prisma.product.findMany({
-      where: { id: { in: grouped.map((g) => g.productId) } },
+      where: { id: { in: productIds } },
       select: { id: true, nameEn: true, sku: true, image: true },
     });
     const byId = new Map(products.map((p) => [p.id, p]));
     const rows = grouped
       .map((g) => ({
         product_id: g.productId,
-        product_name: byId.get(g.productId)?.nameEn ?? '',
-        sku: byId.get(g.productId)?.sku ?? '',
-        image: byId.get(g.productId)?.image ?? '',
+        product_name: (g.productId && byId.get(g.productId)?.nameEn) ?? '(deleted product)',
+        sku: (g.productId && byId.get(g.productId)?.sku) ?? '',
+        image: (g.productId && byId.get(g.productId)?.image) ?? '',
         quantity: g._sum.quantity ?? 0,
         amount: g._sum.total ?? 0,
       }))
@@ -285,7 +290,8 @@ export class SalesService {
     const sales = await this.prisma.sale.findMany({ where, include: SALE_INCLUDE, orderBy: { id: 'asc' } });
     const header = ['Sale ID', 'Date', 'Time', 'Worker', 'Product', 'SKU', 'Quantity', 'Unit Price (FCFA)', 'Total (FCFA)'];
     const rows = sales.map((s) => [
-      s.id, s.saleDate, s.createdAt, s.worker.name, s.product.nameEn, s.product.sku ?? '',
+      s.id, s.saleDate, s.createdAt, s.worker?.name ?? '(deleted worker)',
+      s.product?.nameEn ?? '(deleted product)', s.product?.sku ?? '',
       s.quantity, s.unitPrice, s.total,
     ]);
     const csv = toCsv([header, ...rows]);
@@ -293,16 +299,20 @@ export class SalesService {
     return { filename: `continental-sales-${range}.csv`, csv };
   }
 
-  /** Corrects a mistaken sale: removes it and restores the stock. */
+  /** Corrects a mistaken sale: removes it and restores the stock (if the product still exists). */
   async remove(id: string) {
     const sale = await this.prisma.sale.findUnique({ where: { id } });
     if (!sale) throw new NotFoundException('Sale not found');
+    // A superadmin may have since deleted the product entirely (Cloudinary +
+    // DB) — nothing to restore stock to in that case, just remove the sale.
     await this.prisma.$transaction([
       this.prisma.sale.delete({ where: { id: sale.id } }),
-      this.prisma.product.update({
-        where: { id: sale.productId },
-        data: { quantity: { increment: sale.quantity }, updatedAt: this.config.now() },
-      }),
+      ...(sale.productId
+        ? [this.prisma.product.updateMany({
+            where: { id: sale.productId },
+            data: { quantity: { increment: sale.quantity }, updatedAt: this.config.now() },
+          })]
+        : []),
     ]);
     this.realtime.catalogChanged();
     return { ok: true };

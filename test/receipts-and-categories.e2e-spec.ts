@@ -51,7 +51,7 @@ describe('Receipts (math + PDF) and category bulk-delete safety', () => {
     expect(pdfRes.body.length).toBeGreaterThan(1000);
   });
 
-  it('bulk delete by category archives products with sale history and hard-deletes the rest', async () => {
+  it('bulk delete by category always hard-deletes, even a product with sale history, and sales survive gracefully', async () => {
     const http = app.getHttpServer();
     const cat = (await request(http).post('/api/admin/categories').set(auth)
       .send({ name_en: 'Bulk Delete Test Category' })).body.category;
@@ -75,20 +75,24 @@ describe('Receipts (math + PDF) and category bulk-delete safety', () => {
       .set(auth)
       .expect(200);
     expect(result.body.total).toBe(2);
-    expect(result.body.archived).toBe(1);
-    expect(result.body.deleted).toBe(1);
+    expect(result.body.deleted).toBe(2);
 
+    // Both are really gone now — no archived leftovers in the DB.
     const remaining = await request(http)
       .get(`/api/admin/products?category=${cat.key}`)
       .set(auth)
       .expect(200);
-    expect(remaining.body.products).toHaveLength(1);
-    expect(remaining.body.products[0].id).toBe(withSales.id);
-    expect(remaining.body.products[0].published).toBe(0);
-    expect(remaining.body.products[0].quantity).toBe(0);
+    expect(remaining.body.products).toHaveLength(0);
 
-    // The archived (not deleted) product still references this category, so
-    // the in-use guard must still refuse to remove the category itself.
-    await request(http).delete(`/api/admin/categories/${cat.id}`).set(auth).expect(409);
+    // Nothing references this category anymore, so it's deletable too (this
+    // used to 409 because the archived product still pointed at it).
+    await request(http).delete(`/api/admin/categories/${cat.id}`).set(auth).expect(200);
+
+    // The old sale for the deleted product must still render, not crash —
+    // Sale.productId is SetNull on the product's deletion (see schema.prisma).
+    const daily = await request(http).get('/api/sales/daily').set(auth).expect(200);
+    const historicRow = daily.body.detail.find((s: { product_id: string | null }) => s.product_id === null);
+    expect(historicRow).toBeTruthy();
+    expect(historicRow.product_name).toBe('(deleted product)');
   });
 });

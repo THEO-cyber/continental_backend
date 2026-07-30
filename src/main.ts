@@ -26,6 +26,15 @@ async function bootstrap(): Promise<void> {
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
+  // Superadmin and Workers are hosted as separate static sites now, so their
+  // API/Socket.IO calls arrive cross-origin — only these explicitly
+  // configured origins may make credentialed requests. Empty by default
+  // (same-origin only) until CORS_ORIGINS is set.
+  app.enableCors({
+    origin: config.corsOrigins.length ? config.corsOrigins : false,
+    credentials: true,
+  });
+
   // Horizontal scaling: relay Socket.IO through Redis when REDIS_URL is set,
   // so realtime events reach clients on every server replica.
   if (config.redisUrl) {
@@ -35,22 +44,15 @@ async function bootstrap(): Promise<void> {
     logger.log('Socket.IO Redis adapter enabled (multi-instance mode)');
   }
 
-  // Static frontends + uploaded images
+  // Static client site assets + uploaded images
   const week = 7 * 24 * 3600 * 1000;
   app.useStaticAssets(config.uploadsDir, { prefix: '/uploads/', maxAge: 30 * 24 * 3600 * 1000, immutable: true });
   app.useStaticAssets(path.join(config.clientDir, 'public'), { prefix: '/assets/', maxAge: week });
-  // no-cache (not just max-age=0): admin/workers are long-lived open tabs that
-  // poll and refresh live — every load must revalidate with the server so a
-  // deployed JS/CSS change is never masked by a stale disk-cache hit.
-  const revalidateAlways = (res: any) => res.set('Cache-Control', 'no-cache, must-revalidate');
-  app.useStaticAssets(config.superadminDir, { prefix: '/admin/', maxAge: 0, setHeaders: revalidateAlways });
-  app.useStaticAssets(config.workersDir, { prefix: '/workers/', maxAge: 0, setHeaders: revalidateAlways });
 
   await app.listen(config.port);
   logger.log('Continental Auto Parts system is running');
   logger.log(`Public site : ${config.siteUrl}  (/en /fr /zh)`);
-  logger.log(`Superadmin  : ${config.siteUrl}/admin`);
-  logger.log(`Workers     : ${config.siteUrl}/workers`);
+  logger.log(`Allowed cross-origin apps: ${config.corsOrigins.join(', ') || '(none configured)'}`);
 }
 
 bootstrap();
