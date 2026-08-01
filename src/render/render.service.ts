@@ -259,7 +259,7 @@ export class RenderService {
           </div>`).join('')}
         </div>
         <div class="contact-map">
-          <iframe src="${attr(mapEmbed)}" width="100%" height="320" style="border:0" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade" title="${attr(this.config.business.name)} — ${attr(this.config.business.city)} location map"></iframe>
+          <iframe src="${attr(mapEmbed)}" width="100%" height="320" class="contact-map-frame" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade" title="${attr(this.config.business.name)} — ${attr(this.config.business.city)} location map"></iframe>
           <a class="btn btn-map" href="${attr(directions)}" target="_blank" rel="noopener">📍 ${esc(t.contact.directionsCta)}</a>
         </div>
       </div>

@@ -10,7 +10,7 @@ import { ApiReceipt } from './receipts.service';
 // superadmin would casually edit; phone/email/address still come from
 // Admin > Settings so they stay a single source of truth with the client site.
 const LETTERHEAD = {
-  taxpayerNo: 'P036600194793R',
+  taxpayerNo: 'P036600194794793R',
   rccm: 'RC/KBI/2014/A/50',
 };
 
@@ -54,7 +54,7 @@ export class ReceiptPdfService {
     const drawFooter = () => {
       doc.rect(0, FOOTER_Y, PAGE_W, 45).fill(GREEN);
       doc.font('Helvetica-Bold').fontSize(9).fillColor('#ffffff')
-        .text(`N° Contr: ${LETTERHEAD.taxpayerNo}   Tel: ${settings.phone}`, 0, FOOTER_Y + 9, { width: PAGE_W, align: 'center' })
+        .text(`NIU: ${LETTERHEAD.taxpayerNo}   Tel: ${settings.phone}`, 0, FOOTER_Y + 9, { width: PAGE_W, align: 'center' })
         .text(`N° RCCM: ${LETTERHEAD.rccm}   E-mail: ${settings.email}   ${settings.address}`, 0, FOOTER_Y + 24, { width: PAGE_W, align: 'center' });
     };
     const drawWatermark = (top: number, height: number) => {

@@ -81,7 +81,7 @@ model Product {
   branchId      String   @map("branch_id") @db.ObjectId
   branch        Branch   @relation(fields: [branchId], references: [id])
   createdById   String?  @map("created_by_id") @db.ObjectId
-  createdBy     User?    @relation("ProductAddedBy", fields: [createdById], references: [id])
+  createdBy     User?    @relation("ProductAddedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt     String   @default("") @map("created_at")
   updatedAt     String   @default("") @map("updated_at")
   sales         Sale[]
@@ -94,21 +94,22 @@ model Product {
 
 model Sale {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  // Optional + SetNull: superadmin can hard-delete a product (Cloudinary +
-  // DB) even with sales history attached (that's the point of the delete —
-  // see products.service.ts). Without SetNull, Prisma's MongoDB referential
-  // integrity emulation blocks the delete outright while any Sale still
-  // points at it. toApiSale() in sales.service.ts renders a null product as
-  // "(deleted product)" instead of crashing.
+  // Optional + SetNull: superadmin can hard-delete a product or worker
+  // (Cloudinary + DB) even with sales history attached (that's the point of
+  // the delete — see products.service.ts / users.service.ts). Without
+  // SetNull, Prisma's MongoDB referential integrity emulation blocks the
+  // delete outright while any Sale still points at it. toApiSale() in
+  // sales.service.ts renders a null product/worker as "(deleted product)" /
+  // "(deleted worker)" instead of crashing.
   productId String?  @map("product_id") @db.ObjectId
-  workerId  String   @map("worker_id") @db.ObjectId
+  workerId  String?  @map("worker_id") @db.ObjectId
   quantity  Int
   unitPrice Int      @map("unit_price")
   total     Int
   saleDate  String   @map("sale_date")
   createdAt String   @default("") @map("created_at")
   product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  worker    User     @relation(fields: [workerId], references: [id])
+  worker    User?    @relation(fields: [workerId], references: [id], onDelete: SetNull)
 
   @@index([saleDate])
   @@index([productId])

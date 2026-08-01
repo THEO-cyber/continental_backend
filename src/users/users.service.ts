@@ -87,16 +87,13 @@ export class UsersService {
 
   async deleteWorker(id: string) {
     const worker = await this.findWorker(id);
-    const hasSales = await this.prisma.sale.findFirst({ where: { workerId: worker.id } });
-    if (hasSales) {
-      // Keep reporting history intact — deactivate instead of hard delete.
-      await this.prisma.user.update({ where: { id: worker.id }, data: { active: 0 } });
-      this.realtime.catalogChanged();
-      return { ok: true, archived: true, message: 'Worker has sales history; account was deactivated instead of deleted.' };
-    }
+    // Sale.workerId/Product.createdById are SetNull on delete (see
+    // schema.prisma), so this is a real hard delete even with sales/added-
+    // products history — sales.service.ts renders those as "(deleted
+    // worker)" instead of crashing.
     await this.prisma.user.delete({ where: { id: worker.id } });
     this.realtime.catalogChanged();
-    return { ok: true, archived: false };
+    return { ok: true };
   }
 
   private async resolveBranchId(requested?: string): Promise<string> {

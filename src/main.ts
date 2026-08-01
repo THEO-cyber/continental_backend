@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import compression from 'compression';
+import helmet from 'helmet';
 import * as path from 'path';
 import { AppModule } from './app.module';
 import { AppConfig } from './config/app.config';
@@ -16,10 +17,32 @@ async function bootstrap(): Promise<void> {
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
   app.use(compression());
+  app.use(helmet({
+    // The public client site (the only HTML this backend renders — admin
+    // and workers are separate static sites now) has no inline scripts or
+    // styles left, so this is a real allowlist, not a hole punched in it.
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'"],
+        imgSrc: ["'self'", 'https://res.cloudinary.com', 'data:'],
+        fontSrc: ["'self'"],
+        connectSrc: ["'self'"],
+        frameSrc: ['https://www.openstreetmap.org'], // the contact-page location embed
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'self'"],
+      },
+    },
+    // Both would otherwise require Cloudinary/OpenStreetMap to opt in via
+    // headers we don't control, breaking product images and the map embed.
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  }));
   app.use((req: any, res: any, next: () => void) => {
-    res.set('X-Content-Type-Options', 'nosniff');
-    res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.set('X-Frame-Options', 'SAMEORIGIN');
     res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
     next();
   });
