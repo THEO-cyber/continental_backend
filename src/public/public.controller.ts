@@ -60,6 +60,32 @@ export class PublicController {
     };
   }
 
+  /** Category display names for the public site (superadmin can add more in Admin > Categories). */
+  @Public()
+  @Get('public/categories')
+  async publicCategories() {
+    const rows = await this.prisma.category.findMany();
+    return {
+      categories: rows.map((c) => ({
+        key: c.key,
+        name_en: c.nameEn,
+        name_fr: c.nameFr || c.nameEn,
+        name_zh: c.nameZh || c.nameEn,
+      })),
+    };
+  }
+
+  /** Slug + last-modified for every live product — sitemap.xml generation only. */
+  @Public()
+  @Get('public/sitemap-data')
+  async publicSitemapData() {
+    const products = await this.prisma.product.findMany({
+      where: { published: 1, status: 'approved' },
+      select: { slug: true, updatedAt: true },
+    });
+    return { products };
+  }
+
   /**
    * Staff catalog (workers + superadmin): includes price and live stock, plus
    * which branch it's at. Defaults to the worker's own branch; pass
@@ -108,6 +134,7 @@ export class PublicController {
     return {
       id: p.id,
       slug: p.slug,
+      sku: p.sku,
       name,
       description,
       category: p.category,
