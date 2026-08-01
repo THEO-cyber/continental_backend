@@ -3,9 +3,9 @@
 # Render" for the one-time manual steps this doesn't cover (custom domain,
 # SITE_URL, changing the default admin password).
 #
-# Superadmin and Workers are hosted separately (static sites, e.g. Cloudflare
-# Pages) and call this API cross-origin -- CORS_ORIGINS must list their real
-# URLs once deployed.
+# Pure API + realtime server. The public site, superadmin, and workers are
+# all separate static/Netlify-hosted apps that call this API cross-origin --
+# CORS_ORIGINS must list their real URLs.
 services:
   - type: web
     name: continental-backend
@@ -15,11 +15,7 @@ services:
     # Starter just buys always-on (no cold-start spin-down); Free works too.
     plan: starter
     region: frankfurt # closest Render region to Cameroon
-    buildCommand: >
-      rm -rf vendor && mkdir -p vendor &&
-      git clone --depth 1 https://github.com/THEO-cyber/continental_client.git vendor/continental_client &&
-      rm -rf vendor/continental_client/.git &&
-      npm install && npx prisma generate && npx nest build
+    buildCommand: npm install && npx prisma generate && npx nest build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -31,9 +27,7 @@ services:
         sync: false # from the Cloudinary dashboard's "API Environment variable" box
       - key: JWT_SECRET
         generateValue: true
-      - key: CLIENT_DIR
-        value: vendor/continental_client
       - key: SITE_URL
-        sync: false # set this once you know your Render URL or custom domain
+        sync: false # the public site's real URL (e.g. Netlify) -- legacy /en, /sitemap.xml etc. on this domain redirect here
       - key: CORS_ORIGINS
-        sync: false # comma-separated: the Superadmin and Workers static-site URLs
+        sync: false # comma-separated: the public site's, Superadmin's, and Workers' real URLs

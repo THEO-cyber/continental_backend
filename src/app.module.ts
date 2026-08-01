@@ -13,10 +13,10 @@ import { SalesModule } from './sales/sales.module';
 import { SettingsModule } from './settings/settings.module';
 import { PublicModule } from './public/public.module';
 import { ReceiptsModule } from './receipts/receipts.module';
-import { RenderModule } from './render/render.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { HttpExceptionsFilter } from './common/filters/http-exceptions.filter';
+import { LegacyRedirectController } from './common/legacy-redirect.controller';
 
 @Module({
   imports: [
@@ -33,8 +33,8 @@ import { HttpExceptionsFilter } from './common/filters/http-exceptions.filter';
     SettingsModule,
     PublicModule,
     ReceiptsModule,
-    RenderModule,
   ],
+  controllers: [LegacyRedirectController],
   providers: [
     // Every route requires a valid JWT unless marked @Public();
     // @Roles() then narrows access per endpoint.

@@ -4,7 +4,6 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import compression from 'compression';
 import helmet from 'helmet';
-import * as path from 'path';
 import { AppModule } from './app.module';
 import { AppConfig } from './config/app.config';
 import { RedisIoAdapter } from './realtime/redis-io.adapter';
@@ -67,14 +66,11 @@ async function bootstrap(): Promise<void> {
     logger.log('Socket.IO Redis adapter enabled (multi-instance mode)');
   }
 
-  // Static client site assets + uploaded images
-  const week = 7 * 24 * 3600 * 1000;
   app.useStaticAssets(config.uploadsDir, { prefix: '/uploads/', maxAge: 30 * 24 * 3600 * 1000, immutable: true });
-  app.useStaticAssets(path.join(config.clientDir, 'public'), { prefix: '/assets/', maxAge: week });
 
   await app.listen(config.port);
-  logger.log('Continental Auto Parts system is running');
-  logger.log(`Public site : ${config.siteUrl}  (/en /fr /zh)`);
+  logger.log('Continental Auto Parts system is running (API + realtime only)');
+  logger.log(`Public site : ${config.siteUrl}  (rendered separately, Netlify-hosted)`);
   logger.log(`Allowed cross-origin apps: ${config.corsOrigins.join(', ') || '(none configured)'}`);
 }
 

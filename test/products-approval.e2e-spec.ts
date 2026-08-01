@@ -3,10 +3,13 @@ import request from 'supertest';
 import { createTestApp, closeTestApp, SUPERADMIN } from './utils/test-app';
 
 /**
- * Regression test for a real bug found in production this project: SSR pages
- * and the sitemap checked `published` but not `status`, so a worker's pending
- * submission was publicly visible before superadmin approval. Every surface a
- * customer can reach must stay blind to a pending product until it's approved.
+ * Regression test for a real bug found in production this project: the
+ * public product list and the sitemap-data feed checked `published` but not
+ * `status`, so a worker's pending submission was publicly visible before
+ * superadmin approval. The client site (a separate, Netlify-hosted app) only
+ * ever sees products through these endpoints, so they're the whole
+ * guarantee now — every one of them must stay blind to a pending product
+ * until it's approved.
  */
 describe('Worker product submission -> approval workflow', () => {
   let app: INestApplication;
@@ -72,14 +75,10 @@ describe('Worker product submission -> approval workflow', () => {
     expect(names).not.toContain(PRODUCT_NAME);
   });
 
-  it('is invisible on the server-rendered home page while pending', async () => {
-    const res = await request(app.getHttpServer()).get('/en').expect(200);
-    expect(res.text).not.toContain(PRODUCT_NAME);
-  });
-
-  it('is invisible on the sitemap while pending', async () => {
-    const res = await request(app.getHttpServer()).get('/sitemap.xml').expect(200);
-    expect(res.text).not.toContain(`/product/${productSlug}`);
+  it('is invisible on the sitemap-data feed while pending', async () => {
+    const res = await request(app.getHttpServer()).get('/api/public/sitemap-data').expect(200);
+    const slugs = res.body.products.map((p: { slug: string }) => p.slug);
+    expect(slugs).not.toContain(productSlug);
   });
 
   it('is invisible on the staff catalog while pending', async () => {
@@ -100,11 +99,8 @@ describe('Worker product submission -> approval workflow', () => {
     const pub = await request(app.getHttpServer()).get('/api/public/products').expect(200);
     expect(pub.body.products.map((p: { name: string }) => p.name)).toContain(PRODUCT_NAME);
 
-    const home = await request(app.getHttpServer()).get('/en').expect(200);
-    expect(home.text).toContain(PRODUCT_NAME);
-
-    const sitemap = await request(app.getHttpServer()).get('/sitemap.xml').expect(200);
-    expect(sitemap.text).toContain(`/product/${productSlug}`);
+    const sitemap = await request(app.getHttpServer()).get('/api/public/sitemap-data').expect(200);
+    expect(sitemap.body.products.map((p: { slug: string }) => p.slug)).toContain(productSlug);
   });
 
   it('a rejected product is deleted and never appears anywhere', async () => {
