@@ -150,7 +150,10 @@ model Receipt {
 model ReceiptItem {
   id          String  @id @default(auto()) @map("_id") @db.ObjectId
   receiptId   String  @map("receipt_id") @db.ObjectId
-  receipt     Receipt @relation(fields: [receiptId], references: [id])
+  // Cascade: deleting a receipt deletes its line items with it (unlike
+  // Sale/Product, a receipt with no items isn't meaningful history worth
+  // keeping around) — see ReceiptsService.remove().
+  receipt     Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   productId   String? @map("product_id") @db.ObjectId
   productName String  @map("product_name")
   sku         String  @default("")

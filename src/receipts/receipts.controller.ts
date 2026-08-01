@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { ReceiptsService } from './receipts.service';
 import { ReceiptPdfService } from './receipt-pdf.service';
@@ -36,5 +36,10 @@ export class ReceiptsController {
   ) {
     const receipt = await this.receipts.findOne(id);
     await this.pdf.stream(receipt, res, download === '1');
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.receipts.remove(id);
   }
 }

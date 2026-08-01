@@ -152,4 +152,11 @@ export class ReceiptsService {
     if (!receipt) throw new NotFoundException('Receipt not found');
     return toApi(receipt);
   }
+
+  async remove(id: string): Promise<{ ok: true }> {
+    const receipt = await this.prisma.receipt.findUnique({ where: { id } });
+    if (!receipt) throw new NotFoundException('Receipt not found');
+    await this.prisma.receipt.delete({ where: { id } }); // cascades receipt_items — see schema.prisma
+    return { ok: true };
+  }
 }

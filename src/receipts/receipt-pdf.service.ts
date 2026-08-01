@@ -96,13 +96,15 @@ export class ReceiptPdfService {
     doc.font('Helvetica-Bold').fontSize(18).fillColor(NAVY).text('RECEIPT / REÇU', 20, 162, { width: 555, align: 'center' });
     doc.font('Helvetica').fontSize(10).fillColor(MUTED)
       .text(`No: ${receipt.receipt_number}    Date: ${receipt.created_at.slice(0, 10)}`, 20, 186, { width: 555, align: 'center' });
+    doc.font('Helvetica').fontSize(9).fillColor(MUTED)
+      .text(`NIU: ${LETTERHEAD.taxpayerNo}`, 20, 202, { width: 555, align: 'center' });
 
     // ---- bill to ----
     const buyerLabel = receipt.buyer_type === 'company' ? 'Company / Société' : 'Individual / Particulier';
-    doc.font('Helvetica-Bold').fontSize(9).fillColor(MUTED).text('BILL TO / CLIENT', 40, 216);
-    doc.font('Helvetica-Bold').fontSize(13).fillColor(NAVY).text(receipt.buyer_name, 40, 230);
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(MUTED).text('BILL TO / CLIENT', 40, 222);
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(NAVY).text(receipt.buyer_name, 40, 236);
     doc.font('Helvetica').fontSize(9).fillColor(MUTED);
-    let y = 247;
+    let y = 253;
     doc.text(`Type: ${buyerLabel}`, 40, y); y += 13;
     if (receipt.buyer_phone) { doc.text(`Phone: ${receipt.buyer_phone}`, 40, y); y += 13; }
     if (receipt.buyer_address) { doc.text(`Address: ${receipt.buyer_address}`, 40, y); y += 13; }
