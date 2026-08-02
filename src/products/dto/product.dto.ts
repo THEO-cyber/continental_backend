@@ -13,9 +13,9 @@ export class CreateProductDto {
 
   @IsOptional() @IsString() @MaxLength(200) name_fr?: string = '';
   @IsOptional() @IsString() @MaxLength(200) name_zh?: string = '';
-  @IsOptional() @IsString() @MaxLength(2000) desc_en?: string = '';
-  @IsOptional() @IsString() @MaxLength(2000) desc_fr?: string = '';
-  @IsOptional() @IsString() @MaxLength(2000) desc_zh?: string = '';
+  @IsOptional() @IsString() @MaxLength(4000) desc_en?: string = '';
+  @IsOptional() @IsString() @MaxLength(4000) desc_fr?: string = '';
+  @IsOptional() @IsString() @MaxLength(4000) desc_zh?: string = '';
   @IsOptional() @IsString() @MaxLength(50) category?: string = 'accessories';
   @IsOptional() @IsString() @MaxLength(100) brand?: string = '';
   @IsOptional() @IsString() @MaxLength(60) sku?: string = '';
