@@ -9,7 +9,17 @@ import { AppConfig } from './config/app.config';
 import { RedisIoAdapter } from './realtime/redis-io.adapter';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // CORS must be set at creation time, not via a later app.enableCors() call
+  // — under Nest 11 + Express 5 the latter leaves preflight OPTIONS requests
+  // unhandled (404 "Cannot OPTIONS ..."), since the CORS middleware ends up
+  // registered after Express's router has already been finalized. Read
+  // CORS_ORIGINS directly from process.env here (matching AppConfig's own
+  // parsing) since the DI container — and therefore AppConfig — doesn't
+  // exist yet at this point.
+  const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    cors: { origin: corsOrigins.length ? corsOrigins : false, credentials: true },
+  });
   const config = app.get(AppConfig);
   const logger = new Logger('Bootstrap');
 
@@ -47,15 +57,6 @@ async function bootstrap(): Promise<void> {
   });
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-
-  // Superadmin and Workers are hosted as separate static sites now, so their
-  // API/Socket.IO calls arrive cross-origin — only these explicitly
-  // configured origins may make credentialed requests. Empty by default
-  // (same-origin only) until CORS_ORIGINS is set.
-  app.enableCors({
-    origin: config.corsOrigins.length ? config.corsOrigins : false,
-    credentials: true,
-  });
 
   // Horizontal scaling: relay Socket.IO through Redis when REDIS_URL is set,
   // so realtime events reach clients on every server replica.

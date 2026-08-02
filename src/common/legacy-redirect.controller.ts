@@ -23,10 +23,10 @@ export class LegacyRedirectController {
   @Get([
     '/',
     '/en', '/fr', '/zh',
-    '/en/product/*', '/fr/product/*', '/zh/product/*',
+    '/en/product/*splat', '/fr/product/*splat', '/zh/product/*splat',
     '/sitemap.xml', '/robots.txt',
     '/manifest.webmanifest', '/sw.js', '/offline.html',
-    '/assets/*',
+    '/assets/*splat',
   ])
   redirect(@Req() req: Request, @Res() res: Response) {
     res.redirect(301, `${this.config.siteUrl}${req.originalUrl}`);
