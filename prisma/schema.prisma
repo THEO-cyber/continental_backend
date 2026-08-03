@@ -60,13 +60,16 @@ model Category {
 
 // A product is stocked under one or more part numbers (manufacturer part,
 // alternates, cross-reference codes from other brands), each tracked as its
-// own independent quantity — a worker selling this product picks which
-// specific part number the stock comes off of. Embedded (not a separate
+// own independent quantity AND price — different part numbers genuinely
+// cost different amounts (OEM vs. aftermarket vs. an alternate brand). A
+// worker selling this product picks which specific part number the sale
+// (stock and price both) comes off of. Embedded (not a separate
 // collection): part numbers have no identity or lifecycle outside their
 // product, so they move and delete atomically with it.
 type PartNumber {
   partNumber String @map("part_number")
   quantity   Int
+  price      Int
 }
 
 model Product {
@@ -81,7 +84,6 @@ model Product {
   descZh      String       @default("") @map("desc_zh")
   category    String       @default("accessories")
   brand       String       @default("")
-  price       Int          @default(0)
   image       String       @default("")
   published   Int          @default(1)
   // 'approved' (live immediately — superadmin-added) | 'pending' (worker-added,

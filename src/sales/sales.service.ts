@@ -87,7 +87,7 @@ export class SalesService {
       })) as unknown as FindAndModifyResult;
       if (!result.value) throw new ConflictException(`Only ${entry.quantity} left in stock for part number "${partNumber}"`);
 
-      const unitPrice = unitPriceOverride ?? product.price;
+      const unitPrice = unitPriceOverride ?? entry.price;
       const created = await tx.sale.create({
         data: {
           productId,

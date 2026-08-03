@@ -29,9 +29,9 @@ describe('Sales recording + branch scoping', () => {
       .send({ username: 'sales.worker', password: 'password123' })).body.token;
 
     productAId = (await request(http).post('/api/admin/products').set(auth)
-      .send({ name_en: 'Branch A Only Part', price: 5000, part_numbers: [{ part_number: 'BR-A-1', quantity: 10 }], branch_id: branchAId })).body.product.id;
+      .send({ name_en: 'Branch A Only Part', part_numbers: [{ part_number: 'BR-A-1', quantity: 10, price: 5000 }], branch_id: branchAId })).body.product.id;
     productBId = (await request(http).post('/api/admin/products').set(auth)
-      .send({ name_en: 'Branch B Only Part', price: 8000, part_numbers: [{ part_number: 'BR-B-1', quantity: 4 }], branch_id: branchBId })).body.product.id;
+      .send({ name_en: 'Branch B Only Part', part_numbers: [{ part_number: 'BR-B-1', quantity: 4, price: 8000 }], branch_id: branchBId })).body.product.id;
   });
 
   afterAll(async () => {

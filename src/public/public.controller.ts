@@ -120,7 +120,7 @@ export class PublicController {
           id: api.id, slug: api.slug, part_numbers: api.part_numbers,
           name_en: api.name_en, name_fr: api.name_fr,
           category: api.category, brand: api.brand,
-          price: api.price, quantity: api.quantity,
+          price_min: api.price_min, price_max: api.price_max, quantity: api.quantity,
           image: api.image, published: api.published,
           branch_id: api.branch_id, branch_name: api.branch_name,
         };

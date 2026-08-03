@@ -26,6 +26,11 @@ export class PartNumberDto {
   @IsInt({ message: 'Each part number needs a non-negative quantity' })
   @Min(0, { message: 'Each part number needs a non-negative quantity' })
   quantity: number;
+
+  @Type(() => Number)
+  @IsInt({ message: 'Each part number needs a non-negative price' })
+  @Min(0, { message: 'Each part number needs a non-negative price' })
+  price: number;
 }
 
 // Product create/edit arrives as multipart/form-data (an image file rides
@@ -68,11 +73,6 @@ export class CreateProductDto {
   @ArrayMinSize(1, { message: 'At least one part number is required' })
   @ValidateNested({ each: true })
   part_numbers: PartNumberDto[];
-
-  @Type(() => Number)
-  @IsInt({ message: 'price must be a non-negative number' })
-  @Min(0, { message: 'price must be a non-negative number' })
-  price: number;
 
   @IsOptional()
   @Transform(toFlag)

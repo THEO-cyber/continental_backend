@@ -35,10 +35,9 @@ describe('Multiple part numbers per product', () => {
 
     const created = await request(http).post('/api/admin/products').set(auth).send({
       name_en: 'Multi Part Number Filter',
-      price: 5000,
       part_numbers: [
-        { part_number: 'PN-A', quantity: 5 },
-        { part_number: 'PN-B', quantity: 3 },
+        { part_number: 'PN-A', quantity: 5, price: 5000 },
+        { part_number: 'PN-B', quantity: 3, price: 8000 },
       ],
     });
     productId = created.body.product.id;
@@ -52,17 +51,31 @@ describe('Multiple part numbers per product', () => {
     const res = await request(app.getHttpServer())
       .post('/api/admin/products')
       .set(auth)
-      .send({ name_en: 'No Part Numbers', price: 1000, part_numbers: [] });
+      .send({ name_en: 'No Part Numbers', part_numbers: [] });
     expect(res.status).toBe(400);
   });
 
-  it('selling from one part number leaves the other completely untouched', async () => {
+  it('each part number keeps its own price, exposed as a product-level price_min/price_max range', async () => {
+    const product = (await request(app.getHttpServer())
+      .get('/api/admin/products')
+      .set(auth)).body.products.find((p: { id: string }) => p.id === productId);
+    const byPn = Object.fromEntries(
+      product.part_numbers.map((pn: { part_number: string; price: number }) => [pn.part_number, pn.price]),
+    );
+    expect(byPn['PN-A']).toBe(5000);
+    expect(byPn['PN-B']).toBe(8000);
+    expect(product.price_min).toBe(5000);
+    expect(product.price_max).toBe(8000);
+  });
+
+  it('selling from one part number leaves the other completely untouched, and uses that part number\'s own price', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/sales')
       .set('Authorization', `Bearer ${workerToken}`)
       .send({ product_id: productId, part_number: 'PN-A', quantity: 2 })
       .expect(201);
     expect(res.body.sale.sku).toBe('PN-A');
+    expect(res.body.sale.unit_price).toBe(5000); // PN-A's own price, not PN-B's 8000
 
     const product = (await request(app.getHttpServer())
       .get('/api/admin/products')
@@ -73,6 +86,17 @@ describe('Multiple part numbers per product', () => {
     expect(byPn['PN-A']).toBe(3); // 5 - 2
     expect(byPn['PN-B']).toBe(3); // untouched
     expect(product.quantity).toBe(6); // aggregate: 3 + 3
+  });
+
+  it('a worker-entered override price is used instead of the part number\'s own price', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/sales')
+      .set('Authorization', `Bearer ${workerToken}`)
+      .send({ product_id: productId, part_number: 'PN-B', quantity: 1, unit_price: 9500 })
+      .expect(201);
+    expect(res.body.sale.unit_price).toBe(9500); // override, not PN-B's own 8000
+
+    await request(app.getHttpServer()).delete(`/api/sales/${res.body.sale.id}`).set(auth).expect(200);
   });
 
   it('rejects overselling a part number even though another part number on the same product has spare stock', async () => {

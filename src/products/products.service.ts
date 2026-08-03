@@ -22,12 +22,19 @@ export function totalQuantity(p: { partNumbers: Array<{ quantity: number }> }): 
   return p.partNumbers.reduce((sum, pn) => sum + pn.quantity, 0);
 }
 
+/** Min/max across part numbers' prices — summing wouldn't mean anything, unlike quantity. */
+export function priceRange(p: { partNumbers: Array<{ price: number }> }): { min: number; max: number } {
+  const prices = p.partNumbers.map((pn) => pn.price);
+  return { min: Math.min(...prices), max: Math.max(...prices) };
+}
+
 /** v1 API product shape (snake_case) that the admin/workers frontends expect. */
 export function toApiProduct(p: ProductWithRefs) {
+  const range = priceRange(p);
   return {
     id: p.id,
     slug: p.slug,
-    part_numbers: p.partNumbers.map((pn) => ({ part_number: pn.partNumber, quantity: pn.quantity })),
+    part_numbers: p.partNumbers.map((pn) => ({ part_number: pn.partNumber, quantity: pn.quantity, price: pn.price })),
     name_en: p.nameEn,
     name_fr: p.nameFr,
     name_zh: p.nameZh,
@@ -36,7 +43,8 @@ export function toApiProduct(p: ProductWithRefs) {
     desc_zh: p.descZh,
     category: p.category,
     brand: p.brand,
-    price: p.price,
+    price_min: range.min,
+    price_max: range.max,
     quantity: totalQuantity(p),
     image: p.image,
     published: p.published,
@@ -138,7 +146,7 @@ export class ProductsService {
     const product = await this.prisma.product.create({
       data: {
         slug: await this.uniqueSlug(dto.name_en),
-        partNumbers: dto.part_numbers.map((pn) => ({ partNumber: pn.part_number, quantity: pn.quantity })),
+        partNumbers: dto.part_numbers.map((pn) => ({ partNumber: pn.part_number, quantity: pn.quantity, price: pn.price })),
         nameEn: dto.name_en.trim(),
         nameFr: dto.name_fr ?? '',
         nameZh: dto.name_zh ?? '',
@@ -147,7 +155,6 @@ export class ProductsService {
         descZh: dto.desc_zh ?? '',
         category: dto.category || 'accessories',
         brand: dto.brand ?? '',
-        price: dto.price,
         image: imageFile ? imageFile.path : '',
         published: dto.published ?? 1,
         status,
@@ -169,13 +176,13 @@ export class ProductsService {
       nameEn: 'name_en', nameFr: 'name_fr', nameZh: 'name_zh',
       descEn: 'desc_en', descFr: 'desc_fr', descZh: 'desc_zh',
       category: 'category', brand: 'brand',
-      price: 'price', published: 'published', branchId: 'branch_id',
+      published: 'published', branchId: 'branch_id',
     };
     for (const [column, field] of Object.entries(map)) {
       if (dto[field] !== undefined) data[column] = dto[field];
     }
     if (dto.part_numbers !== undefined) {
-      data.partNumbers = dto.part_numbers.map((pn) => ({ partNumber: pn.part_number, quantity: pn.quantity }));
+      data.partNumbers = dto.part_numbers.map((pn) => ({ partNumber: pn.part_number, quantity: pn.quantity, price: pn.price }));
     }
     if (imageFile) {
       this.deleteImageFile(product.image);
@@ -203,7 +210,7 @@ export class ProductsService {
     }
 
     const partNumbers = product.partNumbers.map((pn) =>
-      pn.partNumber === dto.part_number ? { partNumber: pn.partNumber, quantity } : pn,
+      pn.partNumber === dto.part_number ? { partNumber: pn.partNumber, quantity, price: pn.price } : pn,
     );
     const updated = await this.prisma.product.update({
       where: { id: product.id },

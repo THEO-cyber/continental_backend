@@ -24,9 +24,9 @@ describe('Receipts (math + PDF) and category bulk-delete safety', () => {
   it('computes correct item and receipt totals, and generates a real PDF', async () => {
     const http = app.getHttpServer();
     const p1 = (await request(http).post('/api/admin/products').set(auth)
-      .send({ name_en: 'Receipt Test Part A', price: 3000, part_numbers: [{ part_number: 'RTP-A', quantity: 20 }] })).body.product;
+      .send({ name_en: 'Receipt Test Part A', part_numbers: [{ part_number: 'RTP-A', quantity: 20, price: 3000 }] })).body.product;
     const p2 = (await request(http).post('/api/admin/products').set(auth)
-      .send({ name_en: 'Receipt Test Part B', price: 7000, part_numbers: [{ part_number: 'RTP-B', quantity: 20 }] })).body.product;
+      .send({ name_en: 'Receipt Test Part B', part_numbers: [{ part_number: 'RTP-B', quantity: 20, price: 7000 }] })).body.product;
 
     const receiptRes = await request(http)
       .post('/api/admin/receipts')
@@ -57,9 +57,9 @@ describe('Receipts (math + PDF) and category bulk-delete safety', () => {
       .send({ name_en: 'Bulk Delete Test Category' })).body.category;
 
     const withSales = (await request(http).post('/api/admin/products').set(auth)
-      .send({ name_en: 'Has Sale History', price: 1000, part_numbers: [{ part_number: 'HSH-1', quantity: 10 }], category: cat.key })).body.product;
+      .send({ name_en: 'Has Sale History', part_numbers: [{ part_number: 'HSH-1', quantity: 10, price: 1000 }], category: cat.key })).body.product;
     const withoutSales = (await request(http).post('/api/admin/products').set(auth)
-      .send({ name_en: 'No Sale History', price: 1000, part_numbers: [{ part_number: 'NSH-1', quantity: 10 }], category: cat.key })).body.product;
+      .send({ name_en: 'No Sale History', part_numbers: [{ part_number: 'NSH-1', quantity: 10, price: 1000 }], category: cat.key })).body.product;
 
     // Need a worker to record a sale against `withSales`.
     const branchId = (await request(http).get('/api/admin/branches').set(auth)).body.branches[0].id;

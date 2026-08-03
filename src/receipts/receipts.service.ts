@@ -87,7 +87,7 @@ export class ReceiptsService {
       const product = item.product_id ? byId.get(item.product_id) : undefined;
       const name = item.product_name?.trim() || product?.nameEn;
       if (!name) throw new BadRequestException(`Item ${idx + 1} needs a product or a name`);
-      const unitPrice = item.unit_price ?? product?.price;
+      const unitPrice = item.unit_price ?? product?.partNumbers[0]?.price;
       if (unitPrice === undefined) throw new BadRequestException(`Item ${idx + 1} needs a price`);
       const quantity = item.quantity;
       return {

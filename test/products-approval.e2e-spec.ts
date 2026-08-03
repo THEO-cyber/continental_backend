@@ -61,7 +61,7 @@ describe('Worker product submission -> approval workflow', () => {
     const res = await request(app.getHttpServer())
       .post('/api/admin/products')
       .set('Authorization', `Bearer ${workerToken}`)
-      .send({ name_en: PRODUCT_NAME, price: 12000, part_numbers: [{ part_number: 'TURBO-XYZ', quantity: 5 }], branch_id: branchBId })
+      .send({ name_en: PRODUCT_NAME, part_numbers: [{ part_number: 'TURBO-XYZ', quantity: 5, price: 12000 }], branch_id: branchBId })
       .expect(201);
     expect(res.body.product.status).toBe('pending');
     expect(res.body.product.branch_id).toBe(branchAId); // not the spoofed branchBId
@@ -107,7 +107,7 @@ describe('Worker product submission -> approval workflow', () => {
     const created = await request(app.getHttpServer())
       .post('/api/admin/products')
       .set('Authorization', `Bearer ${workerToken}`)
-      .send({ name_en: 'To Be Rejected Part', price: 1000, part_numbers: [{ part_number: 'REJ-1', quantity: 1 }] })
+      .send({ name_en: 'To Be Rejected Part', part_numbers: [{ part_number: 'REJ-1', quantity: 1, price: 1000 }] })
       .expect(201);
     const id = created.body.product.id;
 
