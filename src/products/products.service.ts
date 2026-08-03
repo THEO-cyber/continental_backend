@@ -75,11 +75,13 @@ export class ProductsService {
   /**
    * Superadmin's main catalog: approved items only (worker submissions awaiting
    * review live in pendingList() instead, so they never get mixed in here).
-   * `stock` narrows to 'out' (quantity 0) or 'low' (1..threshold) for the
-   * dedicated stock-alert views; `branchId` scopes to one location. Stock is
-   * a sum across embedded part numbers, so — unlike a plain scalar field —
-   * it can't be filtered in the DB query; narrowed in memory after fetching
-   * (fine at this catalog's scale).
+   * `stock` narrows to 'out' or 'low' for the dedicated stock-alert views —
+   * matched per part number, not the product's aggregate total: a product
+   * with one healthy part number and one at zero still needs to surface,
+   * since that specific part number needs reordering even though the
+   * product overall isn't "out". Narrowed in memory after fetching (fine at
+   * this catalog's scale) since part numbers are an embedded array, not a
+   * plain scalar field a DB query could filter on directly.
    */
   async list(search = '', category = '', opts: { branchId?: string; stock?: string } = {}) {
     const where: Prisma.ProductWhereInput = { status: 'approved' };
@@ -89,8 +91,10 @@ export class ProductsService {
       where, include: PRODUCT_INCLUDE, orderBy: { updatedAt: 'desc' },
     });
     const byStock = products.filter((p) => {
-      if (opts.stock === 'out') return totalQuantity(p) === 0;
-      if (opts.stock === 'low') { const q = totalQuantity(p); return q > 0 && q <= this.config.lowStockThreshold; }
+      if (opts.stock === 'out') return p.partNumbers.some((pn) => pn.quantity === 0);
+      if (opts.stock === 'low') {
+        return p.partNumbers.some((pn) => pn.quantity > 0 && pn.quantity <= this.config.lowStockThreshold);
+      }
       return true;
     });
     return { products: byStock.filter((p) => matchesSearch(p, search)).map(toApiProduct) };
