@@ -16,7 +16,7 @@ export class SalesController {
 
   @Post()
   record(@CurrentUser() user: AuthUser, @Body() dto: RecordSaleDto) {
-    return this.sales.record(user, dto.product_id, dto.quantity, dto.unit_price);
+    return this.sales.record(user, dto.product_id, dto.part_number, dto.quantity, dto.unit_price);
   }
 
   @Get('mine/today')

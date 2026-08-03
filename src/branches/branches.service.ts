@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { PrismaService } from '../prisma/prisma.service';
 import { AppConfig } from '../config/app.config';
 import { RealtimeService } from '../realtime/realtime.service';
+import { totalQuantity } from '../products/products.service';
 import { CreateBranchDto } from './dto/branch.dto';
 
 const LOW_STOCK_THRESHOLD = 5;
@@ -19,7 +20,7 @@ export class BranchesService {
     const branches = await this.prisma.branch.findMany({ orderBy: { id: 'asc' } });
     const products = await this.prisma.product.findMany({
       where: { status: 'approved' },
-      select: { branchId: true, quantity: true },
+      select: { branchId: true, partNumbers: true },
     });
     const workerCounts = await this.prisma.user.groupBy({
       by: ['branchId'],
@@ -38,8 +39,8 @@ export class BranchesService {
           active: b.active,
           created_at: b.createdAt,
           product_count: items.length,
-          out_of_stock: items.filter((p) => p.quantity === 0).length,
-          low_stock: items.filter((p) => p.quantity > 0 && p.quantity <= LOW_STOCK_THRESHOLD).length,
+          out_of_stock: items.filter((p) => totalQuantity(p) === 0).length,
+          low_stock: items.filter((p) => { const q = totalQuantity(p); return q > 0 && q <= LOW_STOCK_THRESHOLD; }).length,
           worker_count: workerCountByBranch.get(b.id) ?? 0,
         };
       }),

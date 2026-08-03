@@ -29,9 +29,9 @@ describe('Sales recording + branch scoping', () => {
       .send({ username: 'sales.worker', password: 'password123' })).body.token;
 
     productAId = (await request(http).post('/api/admin/products').set(auth)
-      .send({ name_en: 'Branch A Only Part', price: 5000, quantity: 10, branch_id: branchAId })).body.product.id;
+      .send({ name_en: 'Branch A Only Part', price: 5000, part_numbers: [{ part_number: 'BR-A-1', quantity: 10 }], branch_id: branchAId })).body.product.id;
     productBId = (await request(http).post('/api/admin/products').set(auth)
-      .send({ name_en: 'Branch B Only Part', price: 8000, quantity: 4, branch_id: branchBId })).body.product.id;
+      .send({ name_en: 'Branch B Only Part', price: 8000, part_numbers: [{ part_number: 'BR-B-1', quantity: 4 }], branch_id: branchBId })).body.product.id;
   });
 
   afterAll(async () => {
@@ -42,7 +42,7 @@ describe('Sales recording + branch scoping', () => {
     const res = await request(app.getHttpServer())
       .post('/api/sales')
       .set('Authorization', `Bearer ${workerToken}`)
-      .send({ product_id: productAId, quantity: 3, unit_price: 4500 })
+      .send({ product_id: productAId, part_number: 'BR-A-1', quantity: 3, unit_price: 4500 })
       .expect(201);
     expect(res.body.sale.total).toBe(3 * 4500);
     expect(res.body.sale.unit_price).toBe(4500);
@@ -59,7 +59,7 @@ describe('Sales recording + branch scoping', () => {
     const res = await request(app.getHttpServer())
       .post('/api/sales')
       .set('Authorization', `Bearer ${workerToken}`)
-      .send({ product_id: productAId, quantity: 999 })
+      .send({ product_id: productAId, part_number: 'BR-A-1', quantity: 999 })
       .expect(409);
     expect(res.body.error).toContain('7 left in stock');
 

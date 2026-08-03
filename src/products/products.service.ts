@@ -17,12 +17,17 @@ const PRODUCT_INCLUDE = {
   createdBy: { select: { name: true } },
 } satisfies Prisma.ProductInclude;
 
+/** Sum of every part number's quantity — "how many of this product, total". */
+export function totalQuantity(p: { partNumbers: Array<{ quantity: number }> }): number {
+  return p.partNumbers.reduce((sum, pn) => sum + pn.quantity, 0);
+}
+
 /** v1 API product shape (snake_case) that the admin/workers frontends expect. */
 export function toApiProduct(p: ProductWithRefs) {
   return {
     id: p.id,
     slug: p.slug,
-    sku: p.sku ?? '',
+    part_numbers: p.partNumbers.map((pn) => ({ part_number: pn.partNumber, quantity: pn.quantity })),
     name_en: p.nameEn,
     name_fr: p.nameFr,
     name_zh: p.nameZh,
@@ -32,7 +37,7 @@ export function toApiProduct(p: ProductWithRefs) {
     category: p.category,
     brand: p.brand,
     price: p.price,
-    quantity: p.quantity,
+    quantity: totalQuantity(p),
     image: p.image,
     published: p.published,
     status: p.status,
@@ -47,8 +52,8 @@ export function toApiProduct(p: ProductWithRefs) {
 export function matchesSearch(p: Product, search: string): boolean {
   if (!search) return true;
   const q = search.toLowerCase();
-  return [p.nameEn, p.nameFr, p.nameZh, p.brand, p.sku ?? '']
-    .some((v) => v.toLowerCase().includes(q));
+  const fields = [p.nameEn, p.nameFr, p.nameZh, p.brand, ...p.partNumbers.map((pn) => pn.partNumber)];
+  return fields.some((v) => v.toLowerCase().includes(q));
 }
 
 @Injectable()
@@ -63,18 +68,24 @@ export class ProductsService {
    * Superadmin's main catalog: approved items only (worker submissions awaiting
    * review live in pendingList() instead, so they never get mixed in here).
    * `stock` narrows to 'out' (quantity 0) or 'low' (1..threshold) for the
-   * dedicated stock-alert views; `branchId` scopes to one location.
+   * dedicated stock-alert views; `branchId` scopes to one location. Stock is
+   * a sum across embedded part numbers, so — unlike a plain scalar field —
+   * it can't be filtered in the DB query; narrowed in memory after fetching
+   * (fine at this catalog's scale).
    */
   async list(search = '', category = '', opts: { branchId?: string; stock?: string } = {}) {
     const where: Prisma.ProductWhereInput = { status: 'approved' };
     if (category) where.category = category;
     if (opts.branchId) where.branchId = opts.branchId;
-    if (opts.stock === 'out') where.quantity = 0;
-    else if (opts.stock === 'low') where.quantity = { gt: 0, lte: this.config.lowStockThreshold };
     const products = await this.prisma.product.findMany({
       where, include: PRODUCT_INCLUDE, orderBy: { updatedAt: 'desc' },
     });
-    return { products: products.filter((p) => matchesSearch(p, search)).map(toApiProduct) };
+    const byStock = products.filter((p) => {
+      if (opts.stock === 'out') return totalQuantity(p) === 0;
+      if (opts.stock === 'low') { const q = totalQuantity(p); return q > 0 && q <= this.config.lowStockThreshold; }
+      return true;
+    });
+    return { products: byStock.filter((p) => matchesSearch(p, search)).map(toApiProduct) };
   }
 
   /** Worker-submitted products awaiting a superadmin decision. */
@@ -127,7 +138,7 @@ export class ProductsService {
     const product = await this.prisma.product.create({
       data: {
         slug: await this.uniqueSlug(dto.name_en),
-        sku: dto.sku ?? '',
+        partNumbers: dto.part_numbers.map((pn) => ({ partNumber: pn.part_number, quantity: pn.quantity })),
         nameEn: dto.name_en.trim(),
         nameFr: dto.name_fr ?? '',
         nameZh: dto.name_zh ?? '',
@@ -137,7 +148,6 @@ export class ProductsService {
         category: dto.category || 'accessories',
         brand: dto.brand ?? '',
         price: dto.price,
-        quantity: dto.quantity ?? 0,
         image: imageFile ? imageFile.path : '',
         published: dto.published ?? 1,
         status,
@@ -158,11 +168,14 @@ export class ProductsService {
     const map: Record<string, keyof UpdateProductDto> = {
       nameEn: 'name_en', nameFr: 'name_fr', nameZh: 'name_zh',
       descEn: 'desc_en', descFr: 'desc_fr', descZh: 'desc_zh',
-      category: 'category', brand: 'brand', sku: 'sku',
-      price: 'price', quantity: 'quantity', published: 'published', branchId: 'branch_id',
+      category: 'category', brand: 'brand',
+      price: 'price', published: 'published', branchId: 'branch_id',
     };
     for (const [column, field] of Object.entries(map)) {
       if (dto[field] !== undefined) data[column] = dto[field];
+    }
+    if (dto.part_numbers !== undefined) {
+      data.partNumbers = dto.part_numbers.map((pn) => ({ partNumber: pn.part_number, quantity: pn.quantity }));
     }
     if (imageFile) {
       this.deleteImageFile(product.image);
@@ -176,17 +189,25 @@ export class ProductsService {
     return { product: toApiProduct(updated) };
   }
 
+  /** Restocks (or corrects) one specific part number's quantity — the others are untouched. */
   async adjustStock(id: string, dto: StockDto) {
     const product = await this.findById(id);
+    const entry = product.partNumbers.find((pn) => pn.partNumber === dto.part_number);
+    if (!entry) throw new BadRequestException(`Part number "${dto.part_number}" not found on this product`);
+
     let quantity: number | undefined;
-    if (dto.delta !== undefined) quantity = product.quantity + dto.delta;
+    if (dto.delta !== undefined) quantity = entry.quantity + dto.delta;
     else if (dto.quantity !== undefined) quantity = dto.quantity;
     if (quantity === undefined || !Number.isFinite(quantity) || quantity < 0) {
       throw new BadRequestException('Resulting quantity must be a non-negative number');
     }
+
+    const partNumbers = product.partNumbers.map((pn) =>
+      pn.partNumber === dto.part_number ? { partNumber: pn.partNumber, quantity } : pn,
+    );
     const updated = await this.prisma.product.update({
       where: { id: product.id },
-      data: { quantity, updatedAt: this.config.now() },
+      data: { partNumbers, updatedAt: this.config.now() },
       include: PRODUCT_INCLUDE,
     });
     this.realtime.catalogChanged();

@@ -3,7 +3,7 @@ import { Product } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppConfig } from '../config/app.config';
 import { SettingsService } from '../settings/settings.service';
-import { matchesSearch, toApiProduct } from '../products/products.service';
+import { matchesSearch, toApiProduct, totalQuantity } from '../products/products.service';
 import { AuthUser, CurrentUser, Public } from '../common/decorators';
 
 @Controller('api')
@@ -117,7 +117,7 @@ export class PublicController {
       products: products.filter((p) => matchesSearch(p, search)).map((p) => {
         const api = toApiProduct(p);
         return {
-          id: api.id, slug: api.slug, sku: api.sku,
+          id: api.id, slug: api.slug, part_numbers: api.part_numbers,
           name_en: api.name_en, name_fr: api.name_fr,
           category: api.category, brand: api.brand,
           price: api.price, quantity: api.quantity,
@@ -134,13 +134,13 @@ export class PublicController {
     return {
       id: p.id,
       slug: p.slug,
-      sku: p.sku,
+      sku: p.partNumbers[0]?.partNumber ?? null,
       name,
       description,
       category: p.category,
       brand: p.brand,
       image: p.image,
-      inStock: p.quantity > 0,
+      inStock: totalQuantity(p) > 0,
     };
   }
 }

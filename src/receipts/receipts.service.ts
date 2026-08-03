@@ -93,7 +93,7 @@ export class ReceiptsService {
       return {
         productId: item.product_id ?? null,
         productName: name,
-        sku: item.sku || product?.sku || '',
+        sku: item.sku || product?.partNumbers[0]?.partNumber || '',
         quantity,
         unitPrice,
         total: unitPrice * quantity,

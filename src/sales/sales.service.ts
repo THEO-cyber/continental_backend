@@ -10,11 +10,18 @@ type SaleWithRefs = Sale & {
   // Nullable despite Prisma's generated type: Mongo doesn't enforce the
   // relation, and superadmin can delete a product that still has sales
   // history (Cloudinary + DB cleanup is the point — see products.service.ts).
-  product: { nameEn: string; sku: string | null; image: string } | null;
+  product: { nameEn: string; image: string } | null;
   worker: { name: string } | null;
 };
 
-/** v1 sale-detail shape (snake_case) used by the admin and workers frontends. */
+/**
+ * v1 sale-detail shape (snake_case) used by the admin and workers frontends.
+ * `sku` snapshots Sale.partNumber (what was actually sold), not a live
+ * lookup on the product — a product's part numbers can change or be removed
+ * after the fact, and a sale record should keep showing what really
+ * happened. Sales predating this feature have no partNumber; the field
+ * blanks out rather than crashing.
+ */
 function toApiSale(s: SaleWithRefs) {
   return {
     id: s.id,
@@ -25,16 +32,18 @@ function toApiSale(s: SaleWithRefs) {
     sale_date: s.saleDate,
     created_at: s.createdAt,
     product_name: s.product?.nameEn ?? '(deleted product)',
-    sku: s.product?.sku ?? '',
+    sku: s.partNumber ?? '',
     image: s.product?.image ?? '',
     worker_name: s.worker?.name ?? '(deleted worker)',
   };
 }
 
 const SALE_INCLUDE = {
-  product: { select: { nameEn: true, sku: true, image: true } },
+  product: { select: { nameEn: true, image: true } },
   worker: { select: { name: true } },
 } satisfies Prisma.SaleInclude;
+
+type FindAndModifyResult = { value: { partNumbers: Array<{ partNumber: string; quantity: number }> } | null };
 
 @Injectable()
 export class SalesService {
@@ -45,25 +54,44 @@ export class SalesService {
   ) {}
 
   /**
-   * Records a sale atomically. The conditional decrement (quantity >= sold)
-   * makes overselling impossible even with many server replicas on PostgreSQL.
-   * Price is not locked to the product's reference price: the worker can enter
-   * the price actually sold at (parts prices are negotiated/vary); omitting it
-   * falls back to the product's current reference price.
+   * Records a sale atomically. Prisma's typed API can't express "conditionally
+   * decrement one matching element of an embedded array, only if it has
+   * enough stock" for MongoDB, so the decrement itself drops to a raw
+   * findAndModify with arrayFilters — verified directly against the real
+   * database (not just assumed) to reject correctly on insufficient stock
+   * with zero partial writes. This preserves the same overselling guard the
+   * old single-quantity field had, just scoped to one part number instead of
+   * the whole product. Price is not locked to the product's reference price:
+   * the worker can enter the price actually sold at (parts prices are
+   * negotiated/vary); omitting it falls back to the product's current
+   * reference price.
    */
-  async record(actor: AuthUser, productId: string, quantity: number, unitPriceOverride?: number) {
+  async record(actor: AuthUser, productId: string, partNumber: string, quantity: number, unitPriceOverride?: number) {
     const saleId = await this.prisma.$transaction(async (tx) => {
       const product = await tx.product.findUnique({ where: { id: productId } });
       if (!product) throw new NotFoundException('Product not found');
-      const decremented = await tx.product.updateMany({
-        where: { id: productId, quantity: { gte: quantity } },
-        data: { quantity: { decrement: quantity }, updatedAt: this.config.now() },
-      });
-      if (!decremented.count) throw new ConflictException(`Only ${product.quantity} left in stock`);
+      const entry = product.partNumbers.find((pn) => pn.partNumber === partNumber);
+      if (!entry) throw new BadRequestException(`Part number "${partNumber}" not found on this product`);
+
+      const result = (await tx.$runCommandRaw({
+        findAndModify: 'products',
+        query: {
+          _id: { $oid: productId },
+          part_numbers: { $elemMatch: { part_number: partNumber, quantity: { $gte: quantity } } },
+        },
+        update: {
+          $inc: { 'part_numbers.$[elem].quantity': -quantity },
+          $set: { updated_at: this.config.now() },
+        },
+        arrayFilters: [{ 'elem.part_number': partNumber }],
+      })) as unknown as FindAndModifyResult;
+      if (!result.value) throw new ConflictException(`Only ${entry.quantity} left in stock for part number "${partNumber}"`);
+
       const unitPrice = unitPriceOverride ?? product.price;
       const created = await tx.sale.create({
         data: {
           productId,
+          partNumber,
           workerId: actor.id,
           quantity,
           unitPrice,
@@ -117,14 +145,13 @@ export class SalesService {
     const productIds = grouped.map((g) => g.productId).filter((pid): pid is string => pid !== null);
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, nameEn: true, sku: true, image: true },
+      select: { id: true, nameEn: true, image: true },
     });
     const byId = new Map(products.map((p) => [p.id, p]));
     const rows = grouped
       .map((g) => ({
         product_id: g.productId,
         product_name: (g.productId && byId.get(g.productId)?.nameEn) ?? '(deleted product)',
-        sku: (g.productId && byId.get(g.productId)?.sku) ?? '',
         image: (g.productId && byId.get(g.productId)?.image) ?? '',
         quantity: g._sum.quantity ?? 0,
         amount: g._sum.total ?? 0,
@@ -211,14 +238,13 @@ export class SalesService {
     const productIds = grouped.map((g) => g.productId).filter((pid): pid is string => pid !== null);
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, nameEn: true, sku: true, image: true },
+      select: { id: true, nameEn: true, image: true },
     });
     const byId = new Map(products.map((p) => [p.id, p]));
     const rows = grouped
       .map((g) => ({
         product_id: g.productId,
         product_name: (g.productId && byId.get(g.productId)?.nameEn) ?? '(deleted product)',
-        sku: (g.productId && byId.get(g.productId)?.sku) ?? '',
         image: (g.productId && byId.get(g.productId)?.image) ?? '',
         quantity: g._sum.quantity ?? 0,
         amount: g._sum.total ?? 0,
@@ -262,7 +288,7 @@ export class SalesService {
   /** CSV export of one worker's transactions for a period — for offline/company records. */
   async workerExportCsv(workerId: string, period?: string, date?: string): Promise<{ filename: string; csv: string }> {
     const report = await this.workerReport(workerId, period, date);
-    const header = ['Sale ID', 'Date', 'Time', 'Product', 'SKU', 'Quantity', 'Unit Price (FCFA)', 'Total (FCFA)'];
+    const header = ['Sale ID', 'Date', 'Time', 'Product', 'Part Number', 'Quantity', 'Unit Price (FCFA)', 'Total (FCFA)'];
     const rows = report.detail.map((s) => [
       s.id, s.sale_date, s.created_at, s.product_name, s.sku, s.quantity, s.unit_price, s.total,
     ]);
@@ -288,10 +314,10 @@ export class SalesService {
     if (params.workerId) where.workerId = params.workerId;
 
     const sales = await this.prisma.sale.findMany({ where, include: SALE_INCLUDE, orderBy: { id: 'asc' } });
-    const header = ['Sale ID', 'Date', 'Time', 'Worker', 'Product', 'SKU', 'Quantity', 'Unit Price (FCFA)', 'Total (FCFA)'];
+    const header = ['Sale ID', 'Date', 'Time', 'Worker', 'Product', 'Part Number', 'Quantity', 'Unit Price (FCFA)', 'Total (FCFA)'];
     const rows = sales.map((s) => [
       s.id, s.saleDate, s.createdAt, s.worker?.name ?? '(deleted worker)',
-      s.product?.nameEn ?? '(deleted product)', s.product?.sku ?? '',
+      s.product?.nameEn ?? '(deleted product)', s.partNumber ?? '',
       s.quantity, s.unitPrice, s.total,
     ]);
     const csv = toCsv([header, ...rows]);
@@ -304,13 +330,20 @@ export class SalesService {
     const sale = await this.prisma.sale.findUnique({ where: { id } });
     if (!sale) throw new NotFoundException('Sale not found');
     // A superadmin may have since deleted the product entirely (Cloudinary +
-    // DB) — nothing to restore stock to in that case, just remove the sale.
+    // DB), or edited away the part number this sale was recorded against —
+    // nothing to restore stock to in either case, just remove the sale. The
+    // arrayFilters update below already no-ops harmlessly if nothing matches.
     await this.prisma.$transaction([
       this.prisma.sale.delete({ where: { id: sale.id } }),
-      ...(sale.productId
-        ? [this.prisma.product.updateMany({
-            where: { id: sale.productId },
-            data: { quantity: { increment: sale.quantity }, updatedAt: this.config.now() },
+      ...(sale.productId && sale.partNumber
+        ? [this.prisma.$runCommandRaw({
+            findAndModify: 'products',
+            query: { _id: { $oid: sale.productId } },
+            update: {
+              $inc: { 'part_numbers.$[elem].quantity': sale.quantity },
+              $set: { updated_at: this.config.now() },
+            },
+            arrayFilters: [{ 'elem.part_number': sale.partNumber }],
           })]
         : []),
     ]);
