@@ -1,7 +1,7 @@
 {
   "name": "continental-backend",
   "version": "2.0.0",
-  "description": "Continental Auto Parts - NestJS backend: public SSR catalog (SEO), superadmin & workers APIs, realtime sync, Prisma ORM",
+  "description": "Continental Automobile - NestJS backend: public SSR catalog (SEO), superadmin & workers APIs, realtime sync, Prisma ORM",
   "scripts": {
     "build": "prisma generate && nest build",
     "start": "prisma db push --skip-generate --accept-data-loss && node dist/main.js",

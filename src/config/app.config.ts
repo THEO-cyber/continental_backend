@@ -50,7 +50,7 @@ export class AppConfig {
     .filter(Boolean);
 
   readonly business = {
-    name: 'Continental Auto Parts',
+    name: 'Continental Automobile',
     legalName: 'Continental',
     city: 'Kribi',
     region: 'South Region',

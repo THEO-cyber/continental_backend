@@ -70,7 +70,7 @@ async function bootstrap(): Promise<void> {
   app.useStaticAssets(config.uploadsDir, { prefix: '/uploads/', maxAge: 30 * 24 * 3600 * 1000, immutable: true });
 
   await app.listen(config.port);
-  logger.log('Continental Auto Parts system is running (API + realtime only)');
+  logger.log('Continental Automobile system is running (API + realtime only)');
   logger.log(`Public site : ${config.siteUrl}  (rendered separately, Netlify-hosted)`);
   logger.log(`Allowed cross-origin apps: ${config.corsOrigins.join(', ') || '(none configured)'}`);
 }

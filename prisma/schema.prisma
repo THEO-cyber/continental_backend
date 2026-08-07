@@ -1,4 +1,4 @@
-// Continental Auto Parts — data model. Runs on MongoDB: DATABASE_URL must be
+// Continental Automobile — data model. Runs on MongoDB: DATABASE_URL must be
 // a mongodb+srv:// (Atlas) or mongodb:// connection string. MongoDB is
 // schemaless at the storage layer, so there's no migration history here —
 // `prisma db push` syncs this schema (indexes, etc.) to the cluster directly.
